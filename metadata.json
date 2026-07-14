@@ -1,0 +1,6 @@
+{
+  "name": "Crown Ludo",
+  "description": "A beautiful and fully playable classic Ludo game with modern Jetpack Compose graphics and local pass-and-play and VS AI modes.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
