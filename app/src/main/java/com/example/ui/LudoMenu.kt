@@ -28,6 +28,9 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -670,6 +673,15 @@ fun LudoMenu(
                                 )
                             },
                             singleLine = true,
+                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                            keyboardActions = KeyboardActions(
+                                onDone = {
+                                    if (newNameInput.trim().isNotEmpty()) {
+                                        viewModel.updateUsername(newNameInput)
+                                        showRenameDialog = false
+                                    }
+                                }
+                            ),
                             colors = OutlinedTextFieldDefaults.colors(
                                 focusedTextColor = Color.White,
                                 unfocusedTextColor = Color.White,
@@ -1760,15 +1772,6 @@ fun LudoMenu(
             )
         }
 
-        // Pinned Banner Ad at the bottom!
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .align(Alignment.BottomCenter)
-        ) {
-            BannerAd()
-        }
-
         // Interactive sponsor ad player overlay!
         if (uiState.adType != null) {
             AlertDialog(
@@ -1834,6 +1837,15 @@ fun LudoMenu(
                 titleContentColor = Color.White,
                 textContentColor = Color.White
             )
+        }
+
+        // Pinned Banner Ad at the bottom!
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .align(Alignment.BottomCenter)
+        ) {
+            BannerAd()
         }
     }
 }

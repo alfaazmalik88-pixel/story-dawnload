@@ -221,8 +221,9 @@ fun LudoBoard(
                         val baseCol = coord.second
 
                         tokenList.forEachIndexed { index, token ->
+                            val isAtHome = token.position == 57
                             // Calculate dynamic stack offset if multiple tokens land on same spot
-                            val stackOffsetRow = if (tokenList.size > 1) {
+                            val stackOffsetRow = if (tokenList.size > 1 && !isAtHome) {
                                 when (index) {
                                     0 -> -0.15f
                                     1 -> 0.15f
@@ -231,7 +232,7 @@ fun LudoBoard(
                                 }
                             } else 0f
 
-                            val stackOffsetCol = if (tokenList.size > 1) {
+                            val stackOffsetCol = if (tokenList.size > 1 && !isAtHome) {
                                 when (index) {
                                     0 -> -0.15f
                                     1 -> -0.15f
@@ -283,11 +284,59 @@ fun LudoBoard(
                                 )
                             }
 
+                            val normalSize = if (isAtHome) {
+                                cellSize * 0.58f
+                            } else if (tokenList.size > 1) {
+                                cellSize * 0.54f
+                            } else {
+                                cellSize * 0.88f
+                            }
+
+                            val pawnWidth = if (isAtHome) {
+                                cellSize * 0.42f
+                            } else if (tokenList.size > 1) {
+                                cellSize * 0.38f
+                            } else {
+                                cellSize * 0.64f
+                            }
+                            val pawnHeight = pawnWidth * 1.35f
+
+                            val sizeFraction = if (isAtHome) {
+                                0.58f
+                            } else if (tokenList.size > 1) {
+                                0.54f
+                            } else {
+                                0.88f
+                            }
+
+                            val cellOffsetX = if (isAtHome) {
+                                0.21f
+                            } else if (tokenList.size > 1) {
+                                0.23f
+                            } else {
+                                0.06f
+                            }
+
+                            val cellOffsetY = if (isAtHome) {
+                                0.21f
+                            } else if (tokenList.size > 1) {
+                                0.23f
+                            } else {
+                                0.06f
+                            }
+
+                            val rawCellX = c + cellOffsetX
+                            val rawCellY = r + cellOffsetY
+
+                            // Coerce within 0 and 15 - sizeFraction so it never bleeds out of the board boundaries
+                            val clampedCellX = rawCellX.coerceIn(0f, 15f - sizeFraction)
+                            val clampedCellY = rawCellY.coerceIn(0f, 15f - sizeFraction)
+
                             val baseModifier = Modifier
-                                .size(if (tokenList.size > 1) cellSize * 0.75f else cellSize * 0.9f)
+                                .size(normalSize)
                                 .offset(
-                                    x = cellSize * (c + if (tokenList.size > 1) 0.12f else 0.05f),
-                                    y = cellSize * (r + if (tokenList.size > 1) 0.12f else 0.05f)
+                                    x = cellSize * clampedCellX,
+                                    y = cellSize * clampedCellY
                                 )
                                 .then(modifierWithPulse)
 
@@ -363,6 +412,137 @@ fun LudoBoard(
                                             center = Offset(centerPt.x - radius * 0.42f, centerPt.y - radius * 0.42f)
                                         )
                                     }
+                            } else if (state.selectedTokenStyle == LudoTokenStyle.CLASSIC_PAWN) {
+                                val standardX = cellSize * clampedCellX
+                                val standardY = cellSize * clampedCellY
+                                
+                                val rawAdjustedX = standardX + (normalSize - pawnWidth) / 2
+                                val rawAdjustedY = standardY + normalSize - pawnHeight
+
+                                val adjustedX = rawAdjustedX.coerceIn(0.dp, cellSize * 15f - pawnWidth)
+                                val adjustedY = rawAdjustedY.coerceIn(0.dp, cellSize * 15f - pawnHeight)
+
+                                Modifier
+                                    .width(pawnWidth)
+                                    .height(pawnHeight)
+                                    .offset(x = adjustedX, y = adjustedY)
+                                    .then(modifierWithPulse)
+                                    .drawBehind {
+                                        val w = size.width
+                                        val h = size.height
+
+                                        // Get base player colors and stroke color from SVG gradient values
+                                        val (lightColor, mainColor, darkColor, strokeColor) = when (token.playerId) {
+                                            0 -> listOf(Color(0xFFFF7A68), Color(0xFFE0362A), Color(0xFF7A1710), Color(0xFF6B1109)) // RED
+                                            1 -> listOf(Color(0xFF6DE79A), Color(0xFF22A85C), Color(0xFF0C4D29), Color(0xFF0A3A1E)) // GREEN
+                                            2 -> listOf(Color(0xFFFFEF9E), Color(0xFFEAB308), Color(0xFF7A5804), Color(0xFF5C4404)) // YELLOW
+                                            else -> listOf(Color(0xFF7CC4FF), Color(0xFF2470C4), Color(0xFF0F3255), Color(0xFF0D2745)) // BLUE
+                                        }
+
+                                        val strokeWidth = if (isTokenClickable) 2.2.dp.toPx() else 1.2.dp.toPx()
+                                        val finalStrokeColor = if (isTokenClickable) Color(0xFFFFD700) else strokeColor
+
+                                        // 1. Draw soft radial shadow at the bottom
+                                        val shadowCx = w * 0.5f
+                                        val shadowCy = h * 0.96f
+                                        val shadowRx = w * 0.45f
+                                        val shadowRy = h * 0.06f
+                                        
+                                        drawOval(
+                                            brush = Brush.radialGradient(
+                                                colors = listOf(Color.Black.copy(alpha = 0.35f), Color.Transparent),
+                                                center = Offset(shadowCx, shadowCy),
+                                                radius = shadowRx
+                                            ),
+                                            topLeft = Offset(shadowCx - shadowRx, shadowCy - shadowRy),
+                                            size = androidx.compose.ui.geometry.Size(shadowRx * 2f, shadowRy * 2f)
+                                        )
+
+                                        // 2. Draw pawn body path (mapped to a classic, elegantly curved pawn shape)
+                                        val bodyPath = Path().apply {
+                                            moveTo(w * 0.15f, h * 0.95f)
+                                            quadraticTo(w * 0.15f, h * 0.65f, w * 0.35f, h * 0.5f) // waist
+                                            quadraticTo(w * 0.28f, h * 0.42f, w * 0.32f, h * 0.35f) // collar
+                                            quadraticTo(w * 0.32f, h * 0.28f, w * 0.5f, h * 0.28f) // neck top center
+                                            quadraticTo(w * 0.68f, h * 0.28f, w * 0.68f, h * 0.35f)
+                                            quadraticTo(w * 0.72f, h * 0.42f, w * 0.65f, h * 0.5f)
+                                            quadraticTo(w * 0.85f, h * 0.65f, w * 0.85f, h * 0.95f)
+                                            close()
+                                        }
+
+                                        // Fill body with beautiful 3D linear gradient (light to dark)
+                                        val bodyFillBrush = Brush.linearGradient(
+                                            colors = listOf(lightColor, mainColor, darkColor),
+                                            start = Offset(w * 0.15f, h * 0.28f),
+                                            end = Offset(w * 0.85f, h * 0.95f)
+                                        )
+                                        drawPath(path = bodyPath, brush = bodyFillBrush)
+                                        
+                                        // Body stroke outline
+                                        drawPath(
+                                            path = bodyPath,
+                                            color = finalStrokeColor,
+                                            style = androidx.compose.ui.graphics.drawscope.Stroke(width = strokeWidth)
+                                        )
+
+                                        // 3. Draw head circle
+                                        val headRadius = w * 0.25f
+                                        val headCenter = Offset(w * 0.5f, h * 0.26f)
+                                        
+                                        val headFillBrush = Brush.linearGradient(
+                                            colors = listOf(lightColor, mainColor, darkColor),
+                                            start = Offset(headCenter.x - headRadius, headCenter.y - headRadius),
+                                            end = Offset(headCenter.x + headRadius, headCenter.y + headRadius)
+                                        )
+                                        drawCircle(
+                                            brush = headFillBrush,
+                                            radius = headRadius,
+                                            center = headCenter
+                                        )
+                                        drawCircle(
+                                            color = finalStrokeColor,
+                                            radius = headRadius,
+                                            center = headCenter,
+                                            style = androidx.compose.ui.graphics.drawscope.Stroke(width = strokeWidth)
+                                        )
+
+                                        // 4. Draw pinnacle/inner accent circle
+                                        val pinRadius = w * 0.06f
+                                        val pinCenter = Offset(w * 0.5f, h * 0.06f)
+                                        drawCircle(
+                                            color = strokeColor,
+                                            radius = pinRadius,
+                                            center = pinCenter
+                                        )
+
+                                        // 5. Draw body highlight (radialGradient id=highlight)
+                                        val bodyHighlightBrush = Brush.radialGradient(
+                                            colorStops = arrayOf(
+                                                0.0f to Color.White.copy(alpha = 0.8f),
+                                                0.5f to Color.White.copy(alpha = 0.15f),
+                                                1.0f to Color.Transparent
+                                            ),
+                                            center = Offset(w * 0.45f, h * 0.55f),
+                                            radius = w * 0.45f
+                                        )
+                                        drawPath(path = bodyPath, brush = bodyHighlightBrush)
+
+                                        // 6. Draw head highlight (radialGradient id=highlight)
+                                        val headHighlightBrush = Brush.radialGradient(
+                                            colorStops = arrayOf(
+                                                0.0f to Color.White.copy(alpha = 0.85f),
+                                                0.45f to Color.White.copy(alpha = 0.18f),
+                                                1.0f to Color.Transparent
+                                            ),
+                                            center = Offset(headCenter.x - headRadius * 0.35f, headCenter.y - headRadius * 0.45f),
+                                            radius = headRadius * 1.3f
+                                        )
+                                        drawCircle(
+                                            brush = headHighlightBrush,
+                                            radius = headRadius,
+                                            center = headCenter
+                                        )
+                                    }
                             } else {
                                 baseModifier
                                     .shadow(if (isTokenClickable) 8.dp else 4.dp, CircleShape)
@@ -385,74 +565,62 @@ fun LudoBoard(
                                 // Token adaptively renders the custom token style chosen by the user!
                                 Column(
                                     horizontalAlignment = Alignment.CenterHorizontally,
-                                    verticalArrangement = Arrangement.Center
+                                    verticalArrangement = Arrangement.Center,
+                                    modifier = if (state.selectedTokenStyle == LudoTokenStyle.CLASSIC_PAWN) {
+                                        Modifier.offset(y = pawnHeight * -0.24f)
+                                    } else Modifier
                                 ) {
-                                    if (state.selectedTokenStyle == LudoTokenStyle.GLOSSY_3D) {
+                                if (state.selectedTokenStyle == LudoTokenStyle.GLOSSY_3D || state.selectedTokenStyle == LudoTokenStyle.CLASSIC_PAWN) {
+                                    // Smooth 3D Glossy and Classic Pawns are clean and smooth without any overlays!
+                                } else {
+                                    val emoji = when (state.selectedTokenStyle) {
+                                        LudoTokenStyle.CLASSIC_PIN -> {
+                                            // If classic pin, we adapt to the selected theme's default emoji style
+                                            when (state.selectedTheme) {
+                                                LudoTheme.CLASSIC -> null
+                                                LudoTheme.COSMIC -> "🚀"
+                                                LudoTheme.ROYAL -> "👑"
+                                                LudoTheme.FOREST -> "🍃"
+                                                LudoTheme.CANDY -> "🍬"
+                                                LudoTheme.OCEAN -> "🐠"
+                                                LudoTheme.CYBERPUNK -> "🔌"
+                                                LudoTheme.EGYPT -> "🏺"
+                                            }
+                                        }
+                                        else -> state.selectedTokenStyle.emoji
+                                    }
+
+                                    if (emoji != null) {
                                         Text(
-                                            text = "${token.id + 1}",
-                                            fontSize = if (tokenList.size > 1) 11.sp else 14.sp,
-                                            fontWeight = FontWeight.Black,
-                                            color = Color.White,
+                                            text = emoji,
+                                            fontSize = if (isAtHome) 9.sp else if (tokenList.size > 1) 12.sp else 16.sp,
                                             style = androidx.compose.ui.text.TextStyle(
                                                 shadow = androidx.compose.ui.graphics.Shadow(
-                                                    color = Color.Black.copy(alpha = 0.5f),
-                                                    offset = Offset(0f, 2f),
-                                                    blurRadius = 4f
+                                                    color = Color.Black.copy(alpha = 0.4f),
+                                                    offset = Offset(0f, 1f),
+                                                    blurRadius = 2f
                                                 )
                                             )
                                         )
                                     } else {
-                                        val emoji = when (state.selectedTokenStyle) {
-                                            LudoTokenStyle.CLASSIC_PIN -> {
-                                                // If classic pin, we adapt to the selected theme's default emoji style
-                                                when (state.selectedTheme) {
-                                                    LudoTheme.CLASSIC -> null
-                                                    LudoTheme.COSMIC -> "🚀"
-                                                    LudoTheme.ROYAL -> "👑"
-                                                    LudoTheme.FOREST -> "🍃"
-                                                    LudoTheme.CANDY -> "🍬"
-                                                    LudoTheme.OCEAN -> "🐠"
-                                                    LudoTheme.CYBERPUNK -> "🔌"
-                                                    LudoTheme.EGYPT -> "🏺"
-                                                }
-                                            }
-                                            else -> state.selectedTokenStyle.emoji
-                                        }
-
-                                        if (emoji != null) {
-                                            Text(text = emoji, fontSize = if (tokenList.size > 1) 10.sp else 14.sp)
-                                            Text(
-                                                text = "${token.id + 1}",
-                                                fontSize = if (tokenList.size > 1) 7.sp else 9.sp,
-                                                fontWeight = FontWeight.Black,
-                                                color = Color.White
-                                            )
-                                        } else {
-                                            Box(
-                                                modifier = Modifier
-                                                    .size(if (tokenList.size > 1) cellSize * 0.38f else cellSize * 0.48f)
-                                                    .background(
-                                                        brush = Brush.linearGradient(
-                                                            colors = listOf(Color(0xFFFFFFFF), Color(0xFFCFD8DC))
-                                                        ),
-                                                        shape = CircleShape
-                                                    )
-                                                    .border(
-                                                        width = 1.dp,
-                                                        color = Color(0xFFFFD700).copy(alpha = 0.8f),
-                                                        shape = CircleShape
+                                        // Standard Ludo coin nested inner concentric ring
+                                        Box(
+                                            modifier = Modifier
+                                                .size(if (isAtHome) cellSize * 0.25f else if (tokenList.size > 1) cellSize * 0.32f else cellSize * 0.42f)
+                                                .background(
+                                                    brush = Brush.radialGradient(
+                                                        colors = listOf(Color(0xFFFFFFFF), Color(0xFFE0E0E0))
                                                     ),
-                                                contentAlignment = Alignment.Center
-                                            ) {
-                                                Text(
-                                                    text = "${token.id + 1}",
-                                                    fontSize = if (tokenList.size > 1) 9.sp else 11.sp,
-                                                    fontWeight = FontWeight.Black,
-                                                    color = Color(0xFF1A1A1A)
+                                                    shape = CircleShape
                                                 )
-                                            }
-                                        }
+                                                .border(
+                                                    width = 1.2.dp,
+                                                    color = Color.White.copy(alpha = 0.9f),
+                                                    shape = CircleShape
+                                                )
+                                        )
                                     }
+                                }
                                 }
                             }
                         }

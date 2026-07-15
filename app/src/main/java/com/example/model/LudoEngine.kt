@@ -133,15 +133,41 @@ object LudoCoordinates {
         }
 
         if (position == 57) {
-            // Reached center home. Let's arrange them nicely in the triangle!
-            val center = centerHomes[playerId] ?: (7 to 7)
-            val offset = when (tokenId) {
-                0 -> -0.2f to -0.2f
-                1 -> 0.2f to -0.2f
-                2 -> -0.2f to 0.2f
-                else -> 0.2f to 0.2f
+            // Reached center home. Put them deeply inside their respective home triangles (around absolute center 7.5, 7.5)!
+            return when (playerId) {
+                0 -> { // RED: Left triangle (centered around row=7.5f, col=6.7f)
+                    when (tokenId) {
+                        0 -> 6.65f to 6.35f
+                        1 -> 7.35f to 6.35f
+                        2 -> 7.0f to 6.75f
+                        else -> 7.0f to 5.85f
+                    }
+                }
+                1 -> { // GREEN: Top triangle (centered around row=6.7f, col=7.5f)
+                    when (tokenId) {
+                        0 -> 6.35f to 6.65f
+                        1 -> 6.35f to 7.35f
+                        2 -> 6.75f to 7.0f
+                        else -> 5.85f to 7.0f
+                    }
+                }
+                2 -> { // YELLOW: Right triangle (centered around row=7.5f, col=8.3f)
+                    when (tokenId) {
+                        0 -> 6.65f to 7.65f
+                        1 -> 7.35f to 7.65f
+                        2 -> 7.0f to 7.25f
+                        else -> 7.0f to 8.15f
+                    }
+                }
+                else -> { // BLUE: Bottom triangle (centered around row=8.3f, col=7.5f)
+                    when (tokenId) {
+                        0 -> 7.65f to 6.65f
+                        1 -> 7.65f to 7.35f
+                        2 -> 7.25f to 7.0f
+                        else -> 8.15f to 7.0f
+                    }
+                }
             }
-            return (center.first.toFloat() + offset.first) to (center.second.toFloat() + offset.second)
         }
 
         if (position in 52..56) {

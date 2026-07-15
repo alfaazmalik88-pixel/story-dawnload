@@ -1,4 +1,29 @@
 import com.google.gms.googleservices.GoogleServicesPlugin.MissingGoogleServicesStrategy
+import java.io.File
+import java.util.Properties
+
+fun getSanitizedEnvSecret(rootDir: File, key: String): String {
+  val envFile = File(rootDir, ".env")
+  val exampleFile = File(rootDir, ".env.example")
+  val props = Properties()
+  try {
+    if (envFile.exists()) {
+      envFile.inputStream().use { props.load(it) }
+    } else if (exampleFile.exists()) {
+      exampleFile.inputStream().use { props.load(it) }
+    }
+  } catch (e: Exception) {
+    // Ignore and fallback
+  }
+  val rawValue = props.getProperty(key) ?: ""
+  // Strip double/single quotes, trailing/leading commas, semicolons, and spaces
+  return rawValue.trim()
+    .replace("\"", "")
+    .replace("'", "")
+    .replace(",", "")
+    .replace(";", "")
+    .trim()
+}
 
 plugins {
   alias(libs.plugins.android.application)
@@ -21,6 +46,17 @@ android {
     versionName = "1.0"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+    // Sanitize and inject Firebase keys to be resilient against malformed user secrets
+    val sanitizedDbUrl = getSanitizedEnvSecret(project.rootDir, "FIREBASE_DATABASE_URL")
+    val sanitizedApiKey = getSanitizedEnvSecret(project.rootDir, "FIREBASE_API_KEY")
+    val sanitizedProjectId = getSanitizedEnvSecret(project.rootDir, "FIREBASE_PROJECT_ID")
+    val sanitizedAppId = getSanitizedEnvSecret(project.rootDir, "FIREBASE_APPLICATION_ID")
+
+    buildConfigField("String", "FIREBASE_DATABASE_URL", "\"$sanitizedDbUrl\"")
+    buildConfigField("String", "FIREBASE_API_KEY", "\"$sanitizedApiKey\"")
+    buildConfigField("String", "FIREBASE_PROJECT_ID", "\"$sanitizedProjectId\"")
+    buildConfigField("String", "FIREBASE_APPLICATION_ID", "\"$sanitizedAppId\"")
   }
 
   signingConfigs {
@@ -66,6 +102,10 @@ android {
 secrets {
   propertiesFileName = ".env"
   defaultPropertiesFileName = ".env.example"
+  ignoreList.add("FIREBASE_DATABASE_URL")
+  ignoreList.add("FIREBASE_API_KEY")
+  ignoreList.add("FIREBASE_PROJECT_ID")
+  ignoreList.add("FIREBASE_APPLICATION_ID")
 }
 
 googleServices {

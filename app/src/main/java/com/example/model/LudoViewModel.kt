@@ -31,6 +31,7 @@ enum class LudoTheme(val displayName: String, val pawnName: String, val diceName
 enum class LudoTokenStyle(val id: String, val displayName: String, val emoji: String, val cost: Int) {
     CLASSIC_PIN("classic_pin", "Standard Pin", "📍", 0),
     GLOSSY_3D("glossy_3d", "Glossy Metallic", "✨", 0),
+    CLASSIC_PAWN("classic_pawn", "Classic 3D Pawn", "♟️", 0),
     SPACE_ROCKET("space_rocket", "Space Rocket", "🚀", 3000),
     GOLDEN_CROWN("golden_crown", "Golden Crown", "👑", 10000),
     SWEET_CANDY("sweet_candy", "Sweet Candy", "🍬", 20000),
@@ -637,9 +638,9 @@ data class LudoState(
     val isDailyRewardAvailable: Boolean = false,
     val lastCheckInTime: Long = 0L,
     val unlockedThemes: Set<LudoTheme> = setOf(LudoTheme.CLASSIC),
-    val selectedTokenStyle: LudoTokenStyle = LudoTokenStyle.CLASSIC_PIN,
+    val selectedTokenStyle: LudoTokenStyle = LudoTokenStyle.CLASSIC_PAWN,
     val selectedDiceStyle: LudoDiceStyle = LudoDiceStyle.CLASSIC_DOTS,
-    val unlockedTokenStyles: Set<LudoTokenStyle> = setOf(LudoTokenStyle.CLASSIC_PIN, LudoTokenStyle.GLOSSY_3D),
+    val unlockedTokenStyles: Set<LudoTokenStyle> = setOf(LudoTokenStyle.CLASSIC_PIN, LudoTokenStyle.GLOSSY_3D, LudoTokenStyle.CLASSIC_PAWN),
     val unlockedDiceStyles: Set<LudoDiceStyle> = setOf(LudoDiceStyle.CLASSIC_DOTS),
     val selectedWagerAmount: Int = 500,
     val onlinePlayerPings: Map<Int, Int> = emptyMap(),
@@ -677,13 +678,14 @@ class LudoViewModel : ViewModel() {
     private var sharedPrefs: android.content.SharedPreferences? = null
 
     fun initPrefs(context: android.content.Context) {
+        if (sharedPrefs != null) return
         val prefs = context.getSharedPreferences("ludo_prefs", android.content.Context.MODE_PRIVATE)
         sharedPrefs = prefs
         
         var username = prefs.getString("username", "") ?: ""
         if (username.isEmpty()) {
             username = "User_ID_" + (100000..999999).random()
-            prefs.edit().putString("username", username).apply()
+            prefs.edit().putString("username", username).commit()
         }
         val coins = prefs.getInt("coins", 1000)
         val lastCheckInTime = prefs.getLong("last_check_in_time", 0L)
@@ -722,7 +724,7 @@ class LudoViewModel : ViewModel() {
         val currentThemeStr = prefs.getString("selected_theme", "CLASSIC") ?: "CLASSIC"
         val currentTheme = try { LudoTheme.valueOf(currentThemeStr) } catch(e: Exception) { LudoTheme.CLASSIC }
 
-        val unlockedTokensStr = prefs.getStringSet("unlocked_tokens", setOf("CLASSIC_PIN", "GLOSSY_3D")) ?: setOf("CLASSIC_PIN", "GLOSSY_3D")
+        val unlockedTokensStr = prefs.getStringSet("unlocked_tokens", setOf("CLASSIC_PIN", "GLOSSY_3D", "CLASSIC_PAWN")) ?: setOf("CLASSIC_PIN", "GLOSSY_3D", "CLASSIC_PAWN")
         val unlockedTokensSet = unlockedTokensStr.mapNotNull {
             try { LudoTokenStyle.valueOf(it) } catch (e: Exception) { null }
         }.toSet()
@@ -744,7 +746,7 @@ class LudoViewModel : ViewModel() {
                 lastCheckInTime = lastCheckInTime,
                 unlockedThemes = unlockedThemesSet.ifEmpty { setOf(LudoTheme.CLASSIC) },
                 selectedTheme = currentTheme,
-                unlockedTokenStyles = unlockedTokensSet.ifEmpty { setOf(LudoTokenStyle.CLASSIC_PIN, LudoTokenStyle.GLOSSY_3D) },
+                unlockedTokenStyles = unlockedTokensSet.ifEmpty { setOf(LudoTokenStyle.CLASSIC_PIN, LudoTokenStyle.GLOSSY_3D, LudoTokenStyle.CLASSIC_PAWN) },
                 selectedTokenStyle = currentToken,
                 unlockedDiceStyles = unlockedDiceSet.ifEmpty { setOf(LudoDiceStyle.CLASSIC_DOTS) },
                 selectedDiceStyle = currentDice,
@@ -757,10 +759,48 @@ class LudoViewModel : ViewModel() {
 
         // Initialize Firebase safely
         try {
-            val app = com.google.firebase.FirebaseApp.initializeApp(context)
+            var app: com.google.firebase.FirebaseApp? = try {
+                com.google.firebase.FirebaseApp.getInstance()
+            } catch (e: Exception) {
+                null
+            }
+
+            if (app == null) {
+                app = try {
+                    com.google.firebase.FirebaseApp.initializeApp(context)
+                } catch (e: Exception) {
+                    null
+                }
+            }
+
+            // Fallback to programmatic Firebase Options if BuildConfig contains valid values
+            if (app == null) {
+                val dbUrl = try { com.example.BuildConfig.FIREBASE_DATABASE_URL } catch (e: Exception) { "" }
+                val apiKey = try { com.example.BuildConfig.FIREBASE_API_KEY } catch (e: Exception) { "" }
+                val projectId = try { com.example.BuildConfig.FIREBASE_PROJECT_ID } catch (e: Exception) { "" }
+                val appId = try { com.example.BuildConfig.FIREBASE_APPLICATION_ID } catch (e: Exception) { "" }
+
+                if (dbUrl.isNotBlank() && !dbUrl.contains("your_firebase_database_url") &&
+                    apiKey.isNotBlank() && !apiKey.contains("your_firebase_api_key") &&
+                    projectId.isNotBlank() && !projectId.contains("your_firebase_project_id") &&
+                    appId.isNotBlank() && !appId.contains("your_firebase_application_id")
+                ) {
+                    val options = com.google.firebase.FirebaseOptions.Builder()
+                        .setDatabaseUrl(dbUrl)
+                        .setApiKey(apiKey)
+                        .setProjectId(projectId)
+                        .setApplicationId(appId)
+                        .build()
+                    app = com.google.firebase.FirebaseApp.initializeApp(context, options)
+                }
+            }
+
             if (app != null) {
                 firebaseDb = FirebaseDatabase.getInstance()
                 isFirebaseAvailable = true
+            } else {
+                firebaseDb = null
+                isFirebaseAvailable = false
             }
         } catch (e: Exception) {
             firebaseDb = null
@@ -859,14 +899,14 @@ class LudoViewModel : ViewModel() {
         val cleanName = newUsername.trim()
         if (cleanName.isNotEmpty()) {
             _uiState.update { it.copy(username = cleanName) }
-            sharedPrefs?.edit()?.putString("username", cleanName)?.apply()
+            sharedPrefs?.edit()?.putString("username", cleanName)?.commit()
         }
     }
 
     fun addCoins(amount: Int) {
         _uiState.update { currentState ->
             val nextCoins = currentState.coins + amount
-            sharedPrefs?.edit()?.putInt("coins", nextCoins)?.apply()
+            sharedPrefs?.edit()?.putInt("coins", nextCoins)?.commit()
             currentState.copy(
                 coins = nextCoins,
                 coinRedeemAmount = amount
@@ -898,7 +938,7 @@ class LudoViewModel : ViewModel() {
     }
 
     // Setup configuration
-    val selectedPlayerCount = MutableStateFlow(4)
+    val selectedPlayerCount = MutableStateFlow(2)
     val selectedUserColor = MutableStateFlow(LudoColor.BLUE)
     val selectedOnlineSubMode = MutableStateFlow(OnlineSubMode.CLASSIC)
 
@@ -914,7 +954,7 @@ class LudoViewModel : ViewModel() {
     init {
         // Initialize default setup values
         viewModelScope.launch {
-            delay(8000)
+            delay(2000)
             _uiState.update { currentState ->
                 if (currentState.gamePhase == GamePhase.SPLASH) {
                     currentState.copy(gamePhase = GamePhase.MODE_SELECT)
@@ -1088,7 +1128,7 @@ class LudoViewModel : ViewModel() {
             // Deduct wager
             val nextCoins = uiState.value.coins - wager
             _uiState.update { it.copy(coins = nextCoins) }
-            sharedPrefs?.edit()?.putInt("coins", nextCoins)?.apply()
+            sharedPrefs?.edit()?.putInt("coins", nextCoins)?.commit()
         }
 
         if (mode == LudoGameMode.HYBRID_ONLINE) {
@@ -1309,7 +1349,8 @@ class LudoViewModel : ViewModel() {
             )
         }
         
-        matchesRef.orderByChild("status").equalTo("waiting").addListenerForSingleValueEvent(object : ValueEventListener {
+        // Limit query to last 10 waiting matches to keep data usage and server reads as low as possible
+        matchesRef.orderByChild("status").equalTo("waiting").limitToLast(10).addListenerForSingleValueEvent(object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
                 var foundMatch = false
                 for (matchSnapshot in snapshot.children) {
@@ -1559,9 +1600,13 @@ class LudoViewModel : ViewModel() {
     fun cleanupFirebaseMatch() {
         val matchId = activeFirebaseMatchId
         val listener = firebaseMatchListener
-        if (matchId != null && listener != null && firebaseDb != null) {
+        if (matchId != null && firebaseDb != null) {
             try {
-                firebaseDb?.getReference("matches")?.child(matchId)?.removeEventListener(listener)
+                if (listener != null) {
+                    firebaseDb?.getReference("matches")?.child(matchId)?.removeEventListener(listener)
+                }
+                // Delete match node from database completely to keep server storage, reads, and writes at a absolute minimum
+                firebaseDb?.getReference("matches")?.child(matchId)?.removeValue()
             } catch (e: Exception) {}
         }
         activeFirebaseMatchId = null
@@ -1634,7 +1679,7 @@ class LudoViewModel : ViewModel() {
                 diceRoll = null,
                 hasRolled = false,
                 isRolling = false,
-                statusMessage = "📶 [Simulator-Mode] Place google-services.json in /app to connect real Firebase! Match started!",
+                statusMessage = "📶 [Simulator-Mode] Add google-services.json OR configure FIREBASE_* keys in the Secrets panel to connect live Firebase!",
                 winnerPlayerId = null,
                 timeLeftSeconds = 300,
                 baseColors = baseColors,
@@ -1673,7 +1718,7 @@ class LudoViewModel : ViewModel() {
                     statusMessage = "⏳ Time's up! ${winner?.name ?: "No one"} wins by highest progress and coins are doubled to $nextCoins 🪙!"
                 )
             }
-            sharedPrefs?.edit()?.putInt("coins", nextCoins)?.apply()
+            sharedPrefs?.edit()?.putInt("coins", nextCoins)?.commit()
         } else {
             _uiState.update {
                 it.copy(
@@ -1707,7 +1752,7 @@ class LudoViewModel : ViewModel() {
                 lastCheckInTime = currentState.lastCheckInTime
             )
         }
-        sharedPrefs?.edit()?.putInt("coins", _uiState.value.coins)?.apply()
+        sharedPrefs?.edit()?.putInt("coins", _uiState.value.coins)?.commit()
     }
 
     fun rollDice() {
@@ -1772,7 +1817,7 @@ class LudoViewModel : ViewModel() {
                         consecutiveSixes = 0
                     )
                 }
-                val limitDelay = if (state.gameMode == LudoGameMode.HYBRID_ONLINE) 400L else 1200L
+                val limitDelay = if (state.gameMode == LudoGameMode.HYBRID_ONLINE) 300L else 500L
                 delay(limitDelay)
                 passTurn()
                 return
@@ -1787,7 +1832,7 @@ class LudoViewModel : ViewModel() {
                     statusMessage = "🎲 ${currentPlayer.name} rolled a $roll. No valid moves possible!"
                 )
             }
-            val noMoveDelay = if (state.gameMode == LudoGameMode.HYBRID_ONLINE) 400L else 1200L
+            val noMoveDelay = if (state.gameMode == LudoGameMode.HYBRID_ONLINE) 300L else 500L
             delay(noMoveDelay)
             passTurn()
         } else {
@@ -1801,7 +1846,7 @@ class LudoViewModel : ViewModel() {
                 if (roll == 6) {
                     triggerBotChat("ROLL_6", currentPlayer.id)
                 }
-                val botDelay = if (state.gameMode == LudoGameMode.HYBRID_ONLINE) 300L else 800L
+                val botDelay = if (state.gameMode == LudoGameMode.HYBRID_ONLINE) 200L else 350L
                 delay(botDelay)
                 makeBotMove(validMoves)
             } else if (validMoves.size == 1) {
@@ -1812,7 +1857,7 @@ class LudoViewModel : ViewModel() {
                         statusMessage = "🎲 You rolled a $roll! Auto-moving your only playable piece..."
                     )
                 }
-                val autoDelay = if (state.gameMode == LudoGameMode.HYBRID_ONLINE) 400L else 1200L
+                val autoDelay = if (state.gameMode == LudoGameMode.HYBRID_ONLINE) 300L else 500L
                 delay(autoDelay) // Clear delay so player sees what they rolled before it moves!
                 
                 // Double check that state hasn't changed or been reset while waiting
@@ -1949,7 +1994,7 @@ class LudoViewModel : ViewModel() {
                             statusMessage = "🏆🏆 CONGRATULATIONS! ${currentPlayer.name} won and coins are doubled to $nextCoins 🪙!"
                         )
                     }
-                    sharedPrefs?.edit()?.putInt("coins", nextCoins)?.apply()
+                    sharedPrefs?.edit()?.putInt("coins", nextCoins)?.commit()
                 } else {
                     _uiState.update { 
                         it.copy(
@@ -2135,7 +2180,7 @@ class LudoViewModel : ViewModel() {
         val nextPlayer = getCurrentPlayer() ?: return
         if (nextPlayer.type == PlayerType.BOT) {
             viewModelScope.launch {
-                val botTriggerDelay = if (uiState.value.gameMode == LudoGameMode.HYBRID_ONLINE) 400L else 1000L
+                val botTriggerDelay = if (uiState.value.gameMode == LudoGameMode.HYBRID_ONLINE) 200L else 400L
                 delay(botTriggerDelay)
                 rollDice()
             }
