@@ -237,14 +237,14 @@ object LudoTranslations {
                     "rules_6" -> "सभी 4 गोटियों को घर के अंदर (केंद्र में) पहुंचाने वाला खिलाड़ी जीतता है!"
                     "classic_title" -> "क्लासिक लूडो"
                     "classic_desc" -> "पारंपरिक 4-खिलाड़ी लूडो मैच"
-                    "one_vs_one_title" -> "1 बनाम 1 मैच"
-                    "one_vs_one_desc" -> "एक खिलाड़ी के खिलाफ तेज गति वाला मुकाबला"
+                    "one_vs_one_title" -> "1 बनाम 1 मैच 🎯"
+                    "one_vs_one_desc" -> "तेज़ गति वाला ऑफ़लाइन मुकाबला (इंटरनेट आवश्यक)"
                     "computer_title" -> "कंप्यूटर गेम"
                     "computer_desc" -> "3 स्मार्ट एआई बॉट्स के खिलाफ अकेले खेलें"
                     "team_up_title" -> "टीम अप (2v2)"
                     "team_up_desc" -> "लाल और पीला बनाम हरा और नीला टीम"
-                    "hybrid_online_title" -> "ऑनलाइन गेम"
-                    "hybrid_online_desc" -> "लाइव ऑनलाइन लूडो मैच"
+                    "hybrid_online_title" -> "मल्टीप्लेयर ऑनलाइन 🌐"
+                    "hybrid_online_desc" -> "ऑनलाइन बहुत सारे लोगों के साथ खेलें (Bahut Online)"
                     "back_confirm_title" -> "क्या आप गेम छोड़ना चाहते हैं?"
                     "back_confirm_desc" -> "यदि आप वापस जाएंगे, तो चालू गेम का दांव (Wager) जब्त हो जाएगा और वापस नहीं मिलेगा! क्या आप वाकई वापस जाना चाहते हैं?"
                     "not_enough_coins" -> "⚠️ आपके पास पर्याप्त सिक्के नहीं हैं! खेलने के लिए आपको %d 🪙 की आवश्यकता है।"
@@ -525,14 +525,14 @@ object LudoTranslations {
                     "rules_6" -> "Enter your home color track and reach the exact center cell (57) to complete the token. Bring all 4 home to win!"
                     "classic_title" -> "Classic Ludo"
                     "classic_desc" -> "Traditional 4-player Ludo match"
-                    "one_vs_one_title" -> "1 vs 1 Match"
-                    "one_vs_one_desc" -> "Fast-paced local match against one opponent"
+                    "one_vs_one_title" -> "1 vs 1 Battle 🎯"
+                    "one_vs_one_desc" -> "Fast offline match (Internet required)"
                     "computer_title" -> "Computer Game"
                     "computer_desc" -> "Play solo against 3 smart AI bots"
                     "team_up_title" -> "Team Up (2v2)"
                     "team_up_desc" -> "Red & Yellow team vs Green & Blue"
-                    "hybrid_online_title" -> "Online Game"
-                    "hybrid_online_desc" -> "Live multiplayer lobby"
+                    "hybrid_online_title" -> "Multiplayer Online 🌐"
+                    "hybrid_online_desc" -> "Play Ludo with multiple players online"
                     "back_confirm_title" -> "क्या आप गेम छोड़ना चाहते हैं? / Do you want to leave the game?"
                     "back_confirm_desc" -> "यदि आप वापस जाएंगे, तो चालू गेम का दांव (Wager) जब्त हो जाएगा और वापस नहीं मिलेगा! क्या आप वाकई वापस जाना चाहते हैं?\n\n(If you go back, your current game progress and wagered coins will be forfeited! Do you really want to go back?)"
                     "not_enough_coins" -> "⚠️ Not enough coins! You need %d 🪙 to play."
@@ -596,7 +596,8 @@ enum class AdType {
     EXTEND_TIME,
     GAME_FINISH,
     RESET,
-    WATCH_AD
+    WATCH_AD,
+    GAME_START
 }
 
 data class ChatMessage(
@@ -608,6 +609,7 @@ data class ChatMessage(
 
 data class LudoState(
     val gamePhase: GamePhase = GamePhase.SPLASH,
+    val isFindingOpponent: Boolean = false,
     val gameMode: LudoGameMode = LudoGameMode.CLASSIC,
     val players: List<Player> = emptyList(),
     val tokens: List<Token> = emptyList(),
@@ -619,6 +621,8 @@ data class LudoState(
     val statusMessage: String = "Ludo Game Setup! Select players and tap Start.",
     val winnerPlayerId: Int? = null,
     val isSoundEnabled: Boolean = true,
+    val isMicEnabled: Boolean = false,
+    val isVoiceEnabled: Boolean = true,
     val timeLeftSeconds: Int = 300,
     val selectedTheme: LudoTheme = LudoTheme.CLASSIC,
     val selectedLanguage: LudoLanguage = LudoLanguage.EN,
@@ -629,6 +633,7 @@ data class LudoState(
     val isTimeWarningDialogShowing: Boolean = false,
     val isRealAdShowing: Boolean = false,
     val isMovingToken: Boolean = false,
+    val movingTokenId: Int? = null,
     val chatMessages: List<ChatMessage> = emptyList(),
     val activePlayerBubbles: Map<Int, String> = emptyMap(), // playerId to message text
     val botTypingName: String? = null, // Name of the bot currently typing
@@ -650,7 +655,16 @@ data class LudoState(
     val watchAdCount: Int = 0,
     val watchAdCooldownRemaining: Long = 0L,
     val guaranteedSixCount: Int = 0,
-    val guaranteedSixCooldownRemaining: Long = 0L
+    val guaranteedSixCooldownRemaining: Long = 0L,
+    val selectedMusicMode: String = "GULF",
+    val friendsList: List<String> = emptyList(),
+    val addedFriends: Set<Int> = emptySet(),
+    val winsComputer: Int = 0,
+    val winsOneVsOne: Int = 0,
+    val winsOnline: Int = 0,
+    val gameplaySpeed: String = "NORMAL",
+    val bio: String = "Ludo Champion! 🎲",
+    val selectedAvatarId: Int = 0
 )
 
 class LudoViewModel : ViewModel() {
@@ -676,8 +690,22 @@ class LudoViewModel : ViewModel() {
     private var timerJob: kotlinx.coroutines.Job? = null
 
     private var sharedPrefs: android.content.SharedPreferences? = null
+    private var appContext: android.content.Context? = null
+
+    private fun isInternetAvailable(): Boolean {
+        val context = appContext ?: return true
+        return try {
+            val connectivityManager = context.getSystemService(android.content.Context.CONNECTIVITY_SERVICE) as android.net.ConnectivityManager
+            val network = connectivityManager.activeNetwork ?: return false
+            val capabilities = connectivityManager.getNetworkCapabilities(network) ?: return false
+            capabilities.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET)
+        } catch (e: Exception) {
+            true
+        }
+    }
 
     fun initPrefs(context: android.content.Context) {
+        appContext = context.applicationContext
         if (sharedPrefs != null) return
         val prefs = context.getSharedPreferences("ludo_prefs", android.content.Context.MODE_PRIVATE)
         sharedPrefs = prefs
@@ -738,6 +766,21 @@ class LudoViewModel : ViewModel() {
         val currentDiceStr = prefs.getString("selected_dice_style", "CLASSIC_DOTS") ?: "CLASSIC_DOTS"
         val currentDice = try { LudoDiceStyle.valueOf(currentDiceStr) } catch(e: Exception) { LudoDiceStyle.CLASSIC_DOTS }
         
+        val musicMode = prefs.getString("selected_music_mode", "GULF") ?: "GULF"
+        LudoAudioEngine.currentMusicMode = musicMode
+        
+        val isMicEnabled = prefs.getBoolean("is_mic_enabled", false)
+        val isVoiceEnabled = prefs.getBoolean("is_voice_enabled", true)
+
+        val savedFriends = prefs.getStringSet("friends_list", emptySet()) ?: emptySet()
+
+        val winsComputer = prefs.getInt("wins_computer", 0)
+        val winsOneVsOne = prefs.getInt("wins_one_vs_one", 0)
+        val winsOnline = prefs.getInt("wins_online", 0)
+        val gameplaySpeed = prefs.getString("gameplay_speed", "NORMAL") ?: "NORMAL"
+        val bio = prefs.getString("bio", "Ludo Champion! 🎲") ?: "Ludo Champion! 🎲"
+        val selectedAvatarId = prefs.getInt("selected_avatar_id", 0)
+
         _uiState.update { currentState ->
             currentState.copy(
                 username = username,
@@ -753,7 +796,17 @@ class LudoViewModel : ViewModel() {
                 watchAdCount = watchAdCount,
                 watchAdCooldownRemaining = watchAdCooldownRemaining,
                 guaranteedSixCount = guaranteedSixCount,
-                guaranteedSixCooldownRemaining = guaranteedSixCooldownRemaining
+                guaranteedSixCooldownRemaining = guaranteedSixCooldownRemaining,
+                selectedMusicMode = musicMode,
+                isMicEnabled = isMicEnabled,
+                isVoiceEnabled = isVoiceEnabled,
+                friendsList = savedFriends.toList(),
+                winsComputer = winsComputer,
+                winsOneVsOne = winsOneVsOne,
+                winsOnline = winsOnline,
+                gameplaySpeed = gameplaySpeed,
+                bio = bio,
+                selectedAvatarId = selectedAvatarId
             )
         }
 
@@ -903,6 +956,17 @@ class LudoViewModel : ViewModel() {
         }
     }
 
+    fun updateBio(newBio: String) {
+        val cleanBio = newBio.trim()
+        _uiState.update { it.copy(bio = cleanBio) }
+        sharedPrefs?.edit()?.putString("bio", cleanBio)?.commit()
+    }
+
+    fun updateSelectedAvatarId(avatarId: Int) {
+        _uiState.update { it.copy(selectedAvatarId = avatarId) }
+        sharedPrefs?.edit()?.putInt("selected_avatar_id", avatarId)?.commit()
+    }
+
     fun addCoins(amount: Int) {
         _uiState.update { currentState ->
             val nextCoins = currentState.coins + amount
@@ -952,6 +1016,9 @@ class LudoViewModel : ViewModel() {
     val setupTypes = MutableStateFlow(listOf(PlayerType.HUMAN, PlayerType.BOT, PlayerType.BOT, PlayerType.BOT))
 
     init {
+        // Start background music automatically
+        LudoAudioEngine.startBgm()
+
         // Initialize default setup values
         viewModelScope.launch {
             delay(2000)
@@ -1026,6 +1093,80 @@ class LudoViewModel : ViewModel() {
             LudoAudioEngine.isSoundEnabled = nextEnabled
             LudoAudioEngine.isMusicEnabled = nextEnabled
             it.copy(isSoundEnabled = nextEnabled)
+        }
+    }
+
+    fun toggleMic() {
+        _uiState.update { 
+            val nextMic = !it.isMicEnabled
+            sharedPrefs?.edit()?.putBoolean("is_mic_enabled", nextMic)?.apply()
+            it.copy(isMicEnabled = nextMic)
+        }
+    }
+
+    fun toggleVoice() {
+        _uiState.update { 
+            val nextVoice = !it.isVoiceEnabled
+            sharedPrefs?.edit()?.putBoolean("is_voice_enabled", nextVoice)?.apply()
+            it.copy(isVoiceEnabled = nextVoice)
+        }
+    }
+
+    fun addFriend(name: String, playerId: Int) {
+        val currentFriends = sharedPrefs?.getStringSet("friends_list", emptySet()) ?: emptySet()
+        val cleanedName = name.replace("🔴", "").replace("🟢", "").replace("🟡", "").replace("🔵", "").trim()
+        val newFriends = currentFriends + cleanedName
+        sharedPrefs?.edit()?.putStringSet("friends_list", newFriends)?.apply()
+        
+        _uiState.update { state ->
+            state.copy(
+                friendsList = newFriends.toList(),
+                addedFriends = state.addedFriends + playerId
+            )
+        }
+    }
+
+    fun setGameplaySpeed(speed: String) {
+        _uiState.update { it.copy(gameplaySpeed = speed) }
+        sharedPrefs?.edit()?.putString("gameplay_speed", speed)?.apply()
+    }
+
+    fun getGameplaySpeedMultiplier(): Double {
+        return when (_uiState.value.gameplaySpeed) {
+            "SLOW" -> 1.2
+            "FAST" -> 0.3
+            "TURBO" -> 0.12
+            else -> 0.6 // Make NORMAL much faster and more responsive as well!
+        }
+    }
+
+    fun recordUserWin(mode: LudoGameMode) {
+        _uiState.update { currentState ->
+            val nextComputer = if (mode == LudoGameMode.VS_COMPUTER) currentState.winsComputer + 1 else currentState.winsComputer
+            val next1v1 = if (mode == LudoGameMode.ONE_VS_ONE) currentState.winsOneVsOne + 1 else currentState.winsOneVsOne
+            val nextOnline = if (mode == LudoGameMode.HYBRID_ONLINE) currentState.winsOnline + 1 else currentState.winsOnline
+            
+            sharedPrefs?.edit()?.apply {
+                putInt("wins_computer", nextComputer)
+                putInt("wins_one_vs_one", next1v1)
+                putInt("wins_online", nextOnline)
+                apply()
+            }
+            
+            currentState.copy(
+                winsComputer = nextComputer,
+                winsOneVsOne = next1v1,
+                winsOnline = nextOnline
+            )
+        }
+    }
+
+    fun toggleMusicMode() {
+        _uiState.update { state ->
+            val nextMode = if (state.selectedMusicMode == "GULF") "CLASSIC" else "GULF"
+            sharedPrefs?.edit()?.putString("selected_music_mode", nextMode)?.apply()
+            LudoAudioEngine.currentMusicMode = nextMode
+            state.copy(selectedMusicMode = nextMode)
         }
     }
 
@@ -1125,6 +1266,17 @@ class LudoViewModel : ViewModel() {
                 _uiState.update { it.copy(statusMessage = msg) }
                 return
             }
+        }
+
+        // Trigger Ad on Game Start!
+        triggerAd(AdType.GAME_START)
+    }
+
+    fun proceedWithStartGame() {
+        val mode = uiState.value.gameMode
+        val wager = uiState.value.selectedWagerAmount
+        val isWagerMode = mode == LudoGameMode.ONE_VS_ONE || mode == LudoGameMode.HYBRID_ONLINE
+        if (isWagerMode) {
             // Deduct wager
             val nextCoins = uiState.value.coins - wager
             _uiState.update { it.copy(coins = nextCoins) }
@@ -1157,7 +1309,17 @@ class LudoViewModel : ViewModel() {
         indexToColor[2] = availableColors.removeAt(0)
 
         // 1. Add User (HUMAN)
-        players.add(Player(id = userIdx, name = uiState.value.username, color = userColor, type = PlayerType.HUMAN))
+        val userLevel = 1 + (uiState.value.winsComputer + uiState.value.winsOneVsOne + uiState.value.winsOnline) / 3
+        players.add(
+            Player(
+                id = userIdx,
+                name = uiState.value.username,
+                color = userColor,
+                type = PlayerType.HUMAN,
+                level = userLevel,
+                avatarId = uiState.value.selectedAvatarId
+            )
+        )
 
         // 2. Add BOTs / other players depending on count
         val otherIndices = when (playerCount) {
@@ -1194,7 +1356,22 @@ class LudoViewModel : ViewModel() {
                     else -> "Kabir 🔵"
                 }
             }
-            players.add(Player(id = otherIdx, name = pName, color = color, type = pType))
+
+            // Assign unique levels and avatarIds
+            val otherLevel = when (color) {
+                LudoColor.RED -> 5
+                LudoColor.GREEN -> 8
+                LudoColor.YELLOW -> 11
+                else -> 3
+            }
+            val otherAvatarId = when (color) {
+                LudoColor.RED -> 2
+                LudoColor.GREEN -> 4
+                LudoColor.YELLOW -> 1
+                else -> 3
+            }
+
+            players.add(Player(id = otherIdx, name = pName, color = color, type = pType, level = otherLevel, avatarId = otherAvatarId))
         }
 
         // Sync setupTypes and setupNames for backward/visual compatibility
@@ -1265,7 +1442,8 @@ class LudoViewModel : ViewModel() {
                 isSoundEnabled = currentSound,
                 baseColors = baseColors,
                 onlinePlayerPings = pings,
-                disconnectedPlayers = emptySet()
+                disconnectedPlayers = emptySet(),
+                addedFriends = emptySet()
             )
         }
 
@@ -1342,28 +1520,63 @@ class LudoViewModel : ViewModel() {
 
     private fun searchOrCreateFirebaseMatch(wager: Int) {
         val matchesRef = firebaseDb?.getReference("matches") ?: return
+        val currentMode = _uiState.value.gameMode
         _uiState.update { 
             it.copy(
                 statusMessage = "📶 Connecting to Firebase Real-time Lobby... ⏳",
-                gameMode = LudoGameMode.HYBRID_ONLINE
+                gameMode = currentMode,
+                isFindingOpponent = true
             )
+        }
+        
+        val targetModeStr = if (currentMode == LudoGameMode.ONE_VS_ONE) "1v1" else "multiplayer"
+        val playerCount = selectedPlayerCount.value
+        
+        // Timeout safeguard: if matchmaking doesn't respond in 4.5 seconds, start simulated online match immediately!
+        val timeoutJob = viewModelScope.launch {
+            delay(4500)
+            if (_uiState.value.isFindingOpponent && activeFirebaseMatchId == null) {
+                _uiState.update { it.copy(statusMessage = "⚡ Slow connection. Starting matchmaking fallback... 🚀") }
+                delay(800)
+                if (_uiState.value.isFindingOpponent && activeFirebaseMatchId == null) {
+                    startSimulatedOnlineMatch(wager)
+                }
+            }
         }
         
         // Limit query to last 10 waiting matches to keep data usage and server reads as low as possible
         matchesRef.orderByChild("status").equalTo("waiting").limitToLast(10).addListenerForSingleValueEvent(object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
+                timeoutJob.cancel() // Cancel the timeout because database responded!
                 var foundMatch = false
                 for (matchSnapshot in snapshot.children) {
                     val matchWager = matchSnapshot.child("wager").getValue(Int::class.java) ?: 500
-                    if (matchWager == wager) {
+                    val matchMode = matchSnapshot.child("mode").getValue(String::class.java) ?: "1v1"
+                    val matchPlayerCount = matchSnapshot.child("targetPlayerCount").getValue(Int::class.java) ?: 2
+                    if (matchWager == wager && matchMode == targetModeStr && matchPlayerCount == playerCount) {
                         val matchId = matchSnapshot.key ?: continue
-                        joinFirebaseMatch(matchId)
-                        foundMatch = true
-                        break
+                        
+                        // We can see which slots are occupied
+                        val playersSnap = matchSnapshot.child("players")
+                        val occupiedSlots = playersSnap.children.mapNotNull { it.key?.toIntOrNull() }
+                        
+                        // Find the first empty slot for this playerCount
+                        val neededSlots = when (playerCount) {
+                            2 -> listOf(1)
+                            3 -> listOf(0, 1)
+                            else -> listOf(0, 1, 2)
+                        }
+                        
+                        val mySlot = neededSlots.firstOrNull { !occupiedSlots.contains(it) }
+                        if (mySlot != null) {
+                            joinFirebaseMatch(matchId, mySlot, playerCount)
+                            foundMatch = true
+                            break
+                        }
                     }
                 }
                 if (!foundMatch) {
-                    createFirebaseMatch(wager)
+                    createFirebaseMatch(wager, playerCount)
                 }
             }
             override fun onCancelled(error: DatabaseError) {
@@ -1372,7 +1585,7 @@ class LudoViewModel : ViewModel() {
         })
     }
 
-    private fun createFirebaseMatch(wager: Int) {
+    private fun createFirebaseMatch(wager: Int, targetPlayerCount: Int) {
         val matchesRef = firebaseDb?.getReference("matches") ?: return
         val matchId = matchesRef.push().key ?: ("match_" + System.currentTimeMillis())
         activeFirebaseMatchId = matchId
@@ -1392,22 +1605,26 @@ class LudoViewModel : ViewModel() {
             }
         }
 
+        val targetModeStr = if (_uiState.value.gameMode == LudoGameMode.ONE_VS_ONE) "1v1" else "multiplayer"
+
         val matchData = mapOf(
             "matchId" to matchId,
             "status" to "waiting",
             "wager" to wager,
+            "mode" to targetModeStr,
+            "targetPlayerCount" to targetPlayerCount,
             "creatorName" to uiState.value.username,
             "currentPlayerIdx" to 3,
             "diceRoll" to null,
             "hasRolled" to false,
             "senderId" to 3,
-            "statusMessage" to "Room created! Waiting for live opponent to join... ⏳",
+            "statusMessage" to "Room created! Waiting for $targetPlayerCount players to join... ⏳",
             "tokenPositions" to initialTokens,
             "players" to mapOf("3" to playerMap)
         )
 
         _uiState.update { 
-            it.copy(statusMessage = "📶 Created Room: ${matchId.takeLast(6).uppercase()}. Waiting for opponent... ⏳")
+            it.copy(statusMessage = "📶 Created Room: ${matchId.takeLast(6).uppercase()}. Waiting for players... ⏳")
         }
 
         matchesRef.child(matchId).setValue(matchData).addOnCompleteListener { task ->
@@ -1419,15 +1636,22 @@ class LudoViewModel : ViewModel() {
         }
     }
 
-    private fun joinFirebaseMatch(matchId: String) {
+    private fun joinFirebaseMatch(matchId: String, slot: Int, targetPlayerCount: Int) {
         val matchRef = firebaseDb?.getReference("matches")?.child(matchId) ?: return
         activeFirebaseMatchId = matchId
-        myFirebasePlayerSlot = 1 // Guest gets slot index 1
+        myFirebasePlayerSlot = slot
+        
+        val colors = when (slot) {
+            0 -> LudoColor.YELLOW
+            1 -> LudoColor.GREEN
+            2 -> LudoColor.RED
+            else -> LudoColor.GREEN
+        }
         
         val playerMap = mapOf(
             "name" to uiState.value.username,
-            "slot" to 1,
-            "color" to LudoColor.GREEN.name,
+            "slot" to slot,
+            "color" to colors.name,
             "isBot" to false
         )
 
@@ -1435,13 +1659,27 @@ class LudoViewModel : ViewModel() {
             it.copy(statusMessage = "🤝 Game found! Syncing state...")
         }
 
-        matchRef.child("players").child("1").setValue(playerMap).addOnCompleteListener { task ->
+        matchRef.child("players").child(slot.toString()).setValue(playerMap).addOnCompleteListener { task ->
             if (task.isSuccessful) {
-                matchRef.updateChildren(mapOf(
-                    "status" to "playing",
-                    "statusMessage" to "Match Started! Real-time syncing active!"
-                ))
-                listenToFirebaseMatch(matchId)
+                matchRef.child("players").addListenerForSingleValueEvent(object : ValueEventListener {
+                    override fun onDataChange(playerSnapshot: DataSnapshot) {
+                        val joinedCount = playerSnapshot.childrenCount.toInt()
+                        if (joinedCount >= targetPlayerCount) {
+                            matchRef.updateChildren(mapOf(
+                                "status" to "playing",
+                                "statusMessage" to "Match Started! Real-time syncing active!"
+                            ))
+                        } else {
+                            matchRef.updateChildren(mapOf(
+                                "statusMessage" to "Player joined! Waiting for remaining players... ⏳"
+                            ))
+                        }
+                        listenToFirebaseMatch(matchId)
+                    }
+                    override fun onCancelled(error: DatabaseError) {
+                        listenToFirebaseMatch(matchId)
+                    }
+                })
             } else {
                 startSimulatedOnlineMatch(uiState.value.selectedWagerAmount)
             }
@@ -1470,46 +1708,68 @@ class LudoViewModel : ViewModel() {
                     val playersSnapshot = snapshot.child("players")
                     val updatedPlayers = mutableListOf<Player>()
                     
-                    val hostSnap = playersSnapshot.child("3")
-                    if (hostSnap.exists()) {
-                        val name = hostSnap.child("name").getValue(String::class.java) ?: "Player 4"
-                        val colorStr = hostSnap.child("color").getValue(String::class.java) ?: "RED"
-                        val color = try { LudoColor.valueOf(colorStr) } catch(e: Exception) { LudoColor.RED }
-                        updatedPlayers.add(Player(id = 3, name = name, color = color, type = PlayerType.HUMAN))
+                    val targetPlayerCount = snapshot.child("targetPlayerCount").getValue(Int::class.java) ?: 2
+                    val expectedSlots = when (targetPlayerCount) {
+                        2 -> listOf(3, 1)
+                        3 -> listOf(3, 0, 1)
+                        else -> listOf(3, 0, 1, 2)
                     }
-                    
-                    val guestSnap = playersSnapshot.child("1")
-                    if (guestSnap.exists()) {
-                        val name = guestSnap.child("name").getValue(String::class.java) ?: "Player 2"
-                        val colorStr = guestSnap.child("color").getValue(String::class.java) ?: "GREEN"
-                        val color = try { LudoColor.valueOf(colorStr) } catch(e: Exception) { LudoColor.GREEN }
-                        updatedPlayers.add(Player(id = 1, name = name, color = color, type = PlayerType.HUMAN))
-                    } else {
-                        if (status == "waiting") {
-                            updatedPlayers.add(Player(id = 1, name = "Waiting Opponent... ⏳", color = LudoColor.GREEN, type = PlayerType.BOT))
+
+                    for (slot in expectedSlots) {
+                        val pSnap = playersSnapshot.child(slot.toString())
+                        if (pSnap.exists()) {
+                            val name = pSnap.child("name").getValue(String::class.java) ?: "Player ${slot + 1}"
+                            val colorStr = pSnap.child("color").getValue(String::class.java) ?: "RED"
+                            val color = try { LudoColor.valueOf(colorStr) } catch(e: Exception) {
+                                when (slot) {
+                                    3 -> LudoColor.BLUE
+                                    0 -> LudoColor.YELLOW
+                                    1 -> LudoColor.GREEN
+                                    else -> LudoColor.RED
+                                }
+                            }
+                            updatedPlayers.add(Player(id = slot, name = name, color = color, type = PlayerType.HUMAN))
+                        } else {
+                            if (status == "waiting") {
+                                val placeholderColor = when (slot) {
+                                    0 -> LudoColor.YELLOW
+                                    1 -> LudoColor.GREEN
+                                    2 -> LudoColor.RED
+                                    else -> LudoColor.BLUE
+                                }
+                                updatedPlayers.add(Player(id = slot, name = "Waiting Opponent... ⏳", color = placeholderColor, type = PlayerType.BOT))
+                            }
                         }
                     }
 
                     updatedPlayers.sortBy { it.id }
 
+                    val currentState = _uiState.value
+                    val isNewGameStarting = currentState.gamePhase != GamePhase.PLAYING && status == "playing"
                     val tokensSnapshot = snapshot.child("tokenPositions")
-                    val updatedTokens = _uiState.value.tokens.map { token ->
+
+                    val baseTokensList = if (isNewGameStarting || currentState.tokens.isEmpty()) {
+                        val newTokens = mutableListOf<Token>()
+                        for (player in updatedPlayers) {
+                            for (tokenId in 0..3) {
+                                newTokens.add(Token(id = tokenId, playerId = player.id, position = 0, color = player.color))
+                            }
+                        }
+                        newTokens
+                    } else {
+                        currentState.tokens
+                    }
+
+                    val updatedTokens = baseTokensList.map { token ->
                         val key = "${token.playerId}_${token.id}"
                         val pos = tokensSnapshot.child(key).getValue(Int::class.java) ?: token.position
                         token.copy(position = pos)
                     }.toMutableList()
-                    
-                    if (updatedTokens.isEmpty() && status == "playing") {
-                        for (player in updatedPlayers) {
-                            for (tokenId in 0..3) {
-                                updatedTokens.add(Token(id = tokenId, playerId = player.id, position = 0, color = player.color))
-                            }
-                        }
-                    }
 
                     _uiState.update { currentState ->
                         currentState.copy(
                             gamePhase = if (status == "playing") GamePhase.PLAYING else currentState.gamePhase,
+                            isFindingOpponent = if (status == "playing") false else currentState.isFindingOpponent,
                             players = updatedPlayers.ifEmpty { currentState.players },
                             tokens = updatedTokens.ifEmpty { currentState.tokens },
                             currentPlayerIdx = currentPlayerIdx,
@@ -1539,15 +1799,21 @@ class LudoViewModel : ViewModel() {
         val players = mutableListOf<Player>()
         val tokens = mutableListOf<Token>()
         
-        val hostName = playersSnapshot.child("3").child("name").getValue(String::class.java) ?: "Host"
-        val hostColorStr = playersSnapshot.child("3").child("color").getValue(String::class.java) ?: "RED"
-        val hostColor = try { LudoColor.valueOf(hostColorStr) } catch(e: Exception) { LudoColor.RED }
-        players.add(Player(id = 3, name = hostName, color = hostColor, type = PlayerType.HUMAN))
-        
-        val guestName = playersSnapshot.child("1").child("name").getValue(String::class.java) ?: "Guest"
-        val guestColorStr = playersSnapshot.child("1").child("color").getValue(String::class.java) ?: "GREEN"
-        val guestColor = try { LudoColor.valueOf(guestColorStr) } catch(e: Exception) { LudoColor.GREEN }
-        players.add(Player(id = 1, name = guestName, color = guestColor, type = PlayerType.HUMAN))
+        for (slotSnap in playersSnapshot.children) {
+            val slotKey = slotSnap.key ?: continue
+            val slotId = slotKey.toIntOrNull() ?: continue
+            val name = slotSnap.child("name").getValue(String::class.java) ?: "Player ${slotId + 1}"
+            val colorStr = slotSnap.child("color").getValue(String::class.java) ?: "RED"
+            val color = try { LudoColor.valueOf(colorStr) } catch(e: Exception) {
+                when (slotId) {
+                    3 -> LudoColor.BLUE
+                    0 -> LudoColor.YELLOW
+                    1 -> LudoColor.GREEN
+                    else -> LudoColor.RED
+                }
+            }
+            players.add(Player(id = slotId, name = name, color = color, type = PlayerType.HUMAN))
+        }
 
         players.sortBy { it.id }
 
@@ -1557,16 +1823,19 @@ class LudoViewModel : ViewModel() {
             }
         }
 
+        val opponentNames = players.filter { it.id != myFirebasePlayerSlot }.joinToString(", ") { it.name }
+
         _uiState.update { currentState ->
             currentState.copy(
                 gamePhase = GamePhase.PLAYING,
+                isFindingOpponent = false,
                 players = players,
                 tokens = tokens,
                 currentPlayerIdx = 3, // Host goes first!
                 diceRoll = null,
                 hasRolled = false,
                 isRolling = false,
-                statusMessage = "🎯 Firebase Match Started! Opponent: ${if (myFirebasePlayerSlot == 3) guestName else hostName}!"
+                statusMessage = "🎯 Firebase Match Started! Opponents: $opponentNames!"
             )
         }
         startTurnTimer(LudoGameMode.HYBRID_ONLINE)
@@ -1611,6 +1880,24 @@ class LudoViewModel : ViewModel() {
         }
         activeFirebaseMatchId = null
         firebaseMatchListener = null
+    }
+
+    fun cancelMatchmaking() {
+        val wager = uiState.value.selectedWagerAmount
+        val mode = uiState.value.gameMode
+        val isWagerMode = mode == LudoGameMode.ONE_VS_ONE || mode == LudoGameMode.HYBRID_ONLINE
+        
+        cleanupFirebaseMatch()
+        _uiState.update { currentState ->
+            val nextCoins = if (isWagerMode) currentState.coins + wager else currentState.coins
+            sharedPrefs?.edit()?.putInt("coins", nextCoins)?.commit()
+            currentState.copy(
+                coins = nextCoins,
+                isFindingOpponent = false,
+                gamePhase = GamePhase.SETUP,
+                statusMessage = "Matchmaking cancelled."
+            )
+        }
     }
 
     private fun startSimulatedOnlineMatch(wager: Int) {
@@ -1669,10 +1956,12 @@ class LudoViewModel : ViewModel() {
             3 to (10..40).random()
         )
 
+        val currentMode = uiState.value.gameMode
         _uiState.update { currentState ->
             currentState.copy(
                 gamePhase = GamePhase.PLAYING,
-                gameMode = LudoGameMode.HYBRID_ONLINE,
+                isFindingOpponent = false,
+                gameMode = currentMode,
                 players = players,
                 tokens = tokens,
                 currentPlayerIdx = players.first().id,
@@ -1684,7 +1973,8 @@ class LudoViewModel : ViewModel() {
                 timeLeftSeconds = 300,
                 baseColors = baseColors,
                 onlinePlayerPings = pings,
-                disconnectedPlayers = emptySet()
+                disconnectedPlayers = emptySet(),
+                addedFriends = emptySet()
             )
         }
 
@@ -1710,6 +2000,7 @@ class LudoViewModel : ViewModel() {
         }
 
         if (isHumanWinner) {
+            recordUserWin(uiState.value.gameMode)
             _uiState.update {
                 it.copy(
                     gamePhase = GamePhase.FINISHED,
@@ -1749,7 +2040,9 @@ class LudoViewModel : ViewModel() {
                 unlockedDiceStyles = currentState.unlockedDiceStyles,
                 selectedWagerAmount = currentState.selectedWagerAmount,
                 isDailyRewardAvailable = currentState.isDailyRewardAvailable,
-                lastCheckInTime = currentState.lastCheckInTime
+                lastCheckInTime = currentState.lastCheckInTime,
+                friendsList = currentState.friendsList,
+                addedFriends = emptySet()
             )
         }
         sharedPrefs?.edit()?.putInt("coins", _uiState.value.coins)?.commit()
@@ -1817,7 +2110,7 @@ class LudoViewModel : ViewModel() {
                         consecutiveSixes = 0
                     )
                 }
-                val limitDelay = if (state.gameMode == LudoGameMode.HYBRID_ONLINE) 300L else 500L
+                val limitDelay = ((if (state.gameMode == LudoGameMode.HYBRID_ONLINE) 150L else 200L) * getGameplaySpeedMultiplier()).toLong()
                 delay(limitDelay)
                 passTurn()
                 return
@@ -1832,7 +2125,7 @@ class LudoViewModel : ViewModel() {
                     statusMessage = "🎲 ${currentPlayer.name} rolled a $roll. No valid moves possible!"
                 )
             }
-            val noMoveDelay = if (state.gameMode == LudoGameMode.HYBRID_ONLINE) 300L else 500L
+            val noMoveDelay = ((if (state.gameMode == LudoGameMode.HYBRID_ONLINE) 150L else 200L) * getGameplaySpeedMultiplier()).toLong()
             delay(noMoveDelay)
             passTurn()
         } else {
@@ -1846,7 +2139,7 @@ class LudoViewModel : ViewModel() {
                 if (roll == 6) {
                     triggerBotChat("ROLL_6", currentPlayer.id)
                 }
-                val botDelay = if (state.gameMode == LudoGameMode.HYBRID_ONLINE) 200L else 350L
+                val botDelay = ((if (state.gameMode == LudoGameMode.HYBRID_ONLINE) 100L else 150L) * getGameplaySpeedMultiplier()).toLong()
                 delay(botDelay)
                 makeBotMove(validMoves)
             } else if (validMoves.size == 1) {
@@ -1857,7 +2150,7 @@ class LudoViewModel : ViewModel() {
                         statusMessage = "🎲 You rolled a $roll! Auto-moving your only playable piece..."
                     )
                 }
-                val autoDelay = if (state.gameMode == LudoGameMode.HYBRID_ONLINE) 300L else 500L
+                val autoDelay = ((if (state.gameMode == LudoGameMode.HYBRID_ONLINE) 150L else 200L) * getGameplaySpeedMultiplier()).toLong()
                 delay(autoDelay) // Clear delay so player sees what they rolled before it moves!
                 
                 // Double check that state hasn't changed or been reset while waiting
@@ -1899,8 +2192,14 @@ class LudoViewModel : ViewModel() {
         val state = _uiState.value
         if (!state.hasRolled || state.isRolling || state.isMovingToken || state.gamePhase != GamePhase.PLAYING) return
         
-        val currentPlayer = getCurrentPlayer() ?: return
-        if (token.playerId != currentPlayer.id) return // Not your token
+        if (state.gameMode == LudoGameMode.HYBRID_ONLINE) {
+            if (token.playerId != myFirebasePlayerSlot || state.currentPlayerIdx != myFirebasePlayerSlot) {
+                return // Not your token or not your turn
+            }
+        } else {
+            val currentPlayer = getCurrentPlayer() ?: return
+            if (token.playerId != currentPlayer.id) return // Not your token
+        }
 
         val roll = state.diceRoll ?: return
         if (!isValidMove(token, roll)) return // Invalid token choice
@@ -1916,20 +2215,27 @@ class LudoViewModel : ViewModel() {
                 return
             }
         }
-        _uiState.update { it.copy(isMovingToken = true) }
+        _uiState.update { it.copy(isMovingToken = true, movingTokenId = token.id) }
         LudoAudioEngine.playTokenMove()
         viewModelScope.launch {
             val startPos = token.position
             val targetPos = if (startPos == 0) 1 else startPos + steps
             val actualSteps = if (startPos == 0) 1 else steps
 
+            val isBot = getCurrentPlayer()?.type == PlayerType.BOT
+            val baseHopDelay = if (isBot) 90L else 115L
+            val hopDelay = (baseHopDelay * getGameplaySpeedMultiplier()).toLong()
+
             // Animate token steps (perfectly balanced speed - comfortable to follow)
             var currentPos = startPos
             for (step in 1..actualSteps) {
                 currentPos++
                 updateTokenPosition(token, currentPos)
-                delay(130) // Balanced hopping speed
+                LudoAudioEngine.playTokenHop()
+                delay(hopDelay)
             }
+
+            _uiState.update { it.copy(movingTokenId = null) }
 
             // Post-move check
             handlePostMoveState(token.copy(position = targetPos), steps)
@@ -1985,6 +2291,7 @@ class LudoViewModel : ViewModel() {
                 }
 
                 if (isHumanWinner) {
+                    recordUserWin(state.gameMode)
                     _uiState.update { 
                         it.copy(
                             isMovingToken = false,
@@ -2095,6 +2402,12 @@ class LudoViewModel : ViewModel() {
 
     private fun passTurn() {
         val state = _uiState.value
+        if (state.gameMode == LudoGameMode.HYBRID_ONLINE && activeFirebaseMatchId != null) {
+            if (state.currentPlayerIdx != myFirebasePlayerSlot) {
+                // Ignore local pass calls if it is not my turn, since the actual active player handles passing and syncing via Firebase!
+                return
+            }
+        }
         
         // Handle random online player connection updates for HYBRID_ONLINE mode
         if (state.gameMode == LudoGameMode.HYBRID_ONLINE) {
@@ -2180,7 +2493,8 @@ class LudoViewModel : ViewModel() {
         val nextPlayer = getCurrentPlayer() ?: return
         if (nextPlayer.type == PlayerType.BOT) {
             viewModelScope.launch {
-                val botTriggerDelay = if (uiState.value.gameMode == LudoGameMode.HYBRID_ONLINE) 200L else 400L
+                val baseBotTriggerDelay = if (uiState.value.gameMode == LudoGameMode.HYBRID_ONLINE) 100L else 150L
+                val botTriggerDelay = (baseBotTriggerDelay * getGameplaySpeedMultiplier()).toLong()
                 delay(botTriggerDelay)
                 rollDice()
             }
@@ -2241,7 +2555,8 @@ class LudoViewModel : ViewModel() {
             _uiState.update { 
                 it.copy(statusMessage = "📶 Online player ${currentPlayer.name} is syncing move over Firebase...")
             }
-            delay(300) // realistic network latency simulation!
+            val onlineDelay = (300 * getGameplaySpeedMultiplier()).toLong()
+            delay(onlineDelay) // realistic network latency simulation!
         } else if (state.gameMode == LudoGameMode.VS_COMPUTER) {
             val prefix = "🤖"
             _uiState.update { 
@@ -2273,7 +2588,8 @@ class LudoViewModel : ViewModel() {
                     it.copy(statusMessage = "$prefix Gemini offline. Moving Token ${fallbackToken.id + 1}...")
                 }
             }
-            delay(800)
+            val computerDelay = (800 * getGameplaySpeedMultiplier()).toLong()
+            delay(computerDelay)
         }
 
         moveToken(chosenToken, diceRoll)
@@ -2303,6 +2619,12 @@ class LudoViewModel : ViewModel() {
     }
 
     fun triggerAd(type: AdType) {
+        if (!isInternetAvailable()) {
+            val language = uiState.value.selectedLanguage
+            val title = LudoTranslations.getTranslation("internet_required_title", language)
+            _uiState.update { it.copy(statusMessage = "❌ $title") }
+            return
+        }
         // Prepare countdown for backup simulated ad player
         _uiState.update { it.copy(adType = type, adSecondsLeft = 5, isRealAdShowing = false) }
         viewModelScope.launch {
@@ -2331,6 +2653,9 @@ class LudoViewModel : ViewModel() {
         viewModelScope.launch {
             _uiState.update { it.copy(adType = null, isRealAdShowing = false) }
             when (type) {
+                AdType.GAME_START -> {
+                    proceedWithStartGame()
+                }
                 AdType.GUARANTEED_SIX -> {
                     LudoAudioEngine.playTurnPass()
                     val currentCount = _uiState.value.guaranteedSixCount + 1
@@ -2413,7 +2738,7 @@ class LudoViewModel : ViewModel() {
 
     fun dismissTimeUpDialog() {
         _uiState.update { it.copy(isTimeUpDialogShowing = false) }
-        endGameOnTimeOut()
+        resetToSetup()
     }
 
     fun dismissTimeWarningDialog() {

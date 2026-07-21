@@ -21,6 +21,7 @@ import com.example.ui.LudoBoard
 import com.example.ui.LudoMenu
 import com.example.ui.LudoSplashScreen
 import com.example.ui.CoinRedeemOverlay
+import com.example.ui.LudoMatchmakingScreen
 import androidx.compose.foundation.layout.Box
 import com.example.ui.theme.MyApplicationTheme
 import com.google.android.gms.ads.AdError
@@ -148,6 +149,14 @@ class MainActivity : ComponentActivity() {
             CoinRedeemOverlay(
               amount = state.coinRedeemAmount,
               onDismiss = { viewModel.dismissCoinRedeemAnimation() }
+            )
+          }
+
+          if (state.isFindingOpponent) {
+            LudoMatchmakingScreen(
+              state = state,
+              viewModel = viewModel,
+              modifier = Modifier.fillMaxSize()
             )
           }
         }

@@ -35,6 +35,16 @@ object LudoAudioEngine {
 
     var isSoundEnabled: Boolean = true
 
+    var currentMusicMode: String = "GULF"
+        set(value) {
+            val changed = field != value
+            field = value
+            if (changed && isMusicEnabled && bgmJob != null && bgmJob?.isActive == true) {
+                stopBgm()
+                startBgm()
+            }
+        }
+
     fun startBgm() {
         if (!isMusicEnabled) return
         if (bgmJob != null && bgmJob?.isActive == true) return
@@ -45,7 +55,7 @@ object LudoAudioEngine {
                     SAMPLE_RATE,
                     AudioFormat.CHANNEL_OUT_MONO,
                     AudioFormat.ENCODING_PCM_16BIT
-                ).coerceAtLeast(4096)
+                ).coerceAtLeast(16384)
 
                 val track = AudioTrack.Builder()
                     .setAudioAttributes(
@@ -68,28 +78,33 @@ object LudoAudioEngine {
                 bgmTrack = track
                 track.play()
 
-                // Melody list: notes (Hz) and durations (ms)
-                // A beautiful, peaceful chiptune pentatonic loop
-                val melody = listOf(
-                    // Phrase 1
+                // Classic Pentatonic melody list
+                val classicMelody = listOf(
                     Note(261.6, 350), Note(293.7, 350), Note(329.6, 350), Note(392.0, 350),
                     Note(329.6, 350), Note(293.7, 350), Note(261.6, 700),
-                    // Phrase 2
                     Note(329.6, 350), Note(392.0, 350), Note(440.0, 350), Note(523.3, 350),
                     Note(440.0, 350), Note(392.0, 350), Note(329.6, 700),
-                    // Phrase 3
                     Note(392.0, 350), Note(440.0, 350), Note(523.3, 350), Note(587.3, 350),
                     Note(523.3, 350), Note(440.0, 350), Note(392.0, 700),
-                    // Phrase 4 (Turnaround)
                     Note(440.0, 350), Note(392.0, 350), Note(329.6, 350), Note(293.7, 350),
                     Note(329.6, 350), Note(293.7, 350), Note(261.6, 700)
                 )
 
+                // Gulf / Middle-Eastern Arabian Oud Hijaz Scale melody list
+                val gulfMelody = listOf(
+                    Note(392.0, 350), Note(415.3, 350), Note(493.9, 700),
+                    Note(493.9, 350), Note(523.3, 350), Note(493.9, 350), Note(415.3, 350), Note(392.0, 700),
+                    Note(493.9, 350), Note(523.3, 350), Note(587.3, 700),
+                    Note(587.3, 350), Note(622.3, 350), Note(587.3, 350), Note(523.3, 350), Note(493.9, 700),
+                    Note(587.3, 350), Note(523.3, 350), Note(493.9, 350), Note(415.3, 350), Note(392.0, 700)
+                )
+
                 var noteIndex = 0
                 while (isActive && isMusicEnabled) {
-                    val note = melody[noteIndex]
-                    writeToneToTrack(track, note.frequency, note.durationMs, volume = 0.05f, type = WaveType.TRIANGLE)
-                    noteIndex = (noteIndex + 1) % melody.size
+                    val melody = if (currentMusicMode == "GULF") gulfMelody else classicMelody
+                    val note = melody[noteIndex % melody.size]
+                    writeToneToTrack(track, note.frequency, note.durationMs, volume = 0.15f, type = WaveType.TRIANGLE)
+                    noteIndex++
                     delay(50) // Small break between notes
                 }
             } catch (e: Exception) {
@@ -168,7 +183,7 @@ object LudoAudioEngine {
                     SAMPLE_RATE,
                     AudioFormat.CHANNEL_OUT_MONO,
                     AudioFormat.ENCODING_PCM_16BIT
-                ).coerceAtLeast(2048)
+                ).coerceAtLeast(4096)
 
                 track = AudioTrack.Builder()
                     .setAudioAttributes(
@@ -211,8 +226,13 @@ object LudoAudioEngine {
     }
 
     fun playTokenMove() {
-        // High, cute bubbly sound
-        playSequence(listOf(392.0, 523.3, 659.3), listOf(60, 60, 80), volume = 0.18f, type = WaveType.TRIANGLE)
+        // A clean, beautiful introductory slide-click sound (SINE wave)
+        playSequence(listOf(587.33, 880.0), listOf(30, 30), volume = 0.15f, type = WaveType.SINE)
+    }
+
+    fun playTokenHop() {
+        // A short, extremely crisp, sweet, and clear retro step sound (SINE wave)
+        playSequence(listOf(880.0, 1174.66), listOf(35, 35), volume = 0.18f, type = WaveType.SINE)
     }
 
     fun playTurnPass() {

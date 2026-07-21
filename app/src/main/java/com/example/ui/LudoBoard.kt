@@ -44,6 +44,12 @@ import androidx.compose.ui.unit.sp
 import com.example.model.*
 import kotlinx.coroutines.delay
 
+private data class TokenGroupKey(
+    val row: Float,
+    val col: Float,
+    val groupId: String
+)
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LudoBoard(
@@ -51,15 +57,20 @@ fun LudoBoard(
     onBack: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val context = androidx.compose.ui.platform.LocalContext.current
     val state by viewModel.uiState.collectAsState()
-    val currentPlayer = viewModel.getCurrentPlayer()
+    val currentPlayer = state.players.firstOrNull { it.id == state.currentPlayerIdx }
 
     var showBackConfirmation by remember { mutableStateOf(false) }
     var showResetConfirmation by remember { mutableStateOf(false) }
+    var showChatDialog by remember { mutableStateOf(false) }
 
-    // Intercept Android hardware or gesture back key during active match
-    BackHandler(enabled = state.gamePhase == GamePhase.PLAYING) {
-        showBackConfirmation = true
+    BackHandler(enabled = true) {
+        if (state.gamePhase == GamePhase.PLAYING) {
+            showBackConfirmation = true
+        } else {
+            onBack()
+        }
     }
 
     // Bouncing/glowing animation for active player tokens & dice
@@ -119,6 +130,36 @@ fun LudoBoard(
                     }
                 },
                 actions = {
+                    val isOnlineOrWagerMode = state.gameMode == LudoGameMode.ONE_VS_ONE || state.gameMode == LudoGameMode.HYBRID_ONLINE
+                    if (isOnlineOrWagerMode) {
+                        // Chat Button
+                        IconButton(onClick = { showChatDialog = true }) {
+                            Icon(
+                                imageVector = Icons.Default.Chat,
+                                contentDescription = "Quick Chat",
+                                tint = Color(0xFFFFD700)
+                            )
+                        }
+
+                        // Speaker/Voice Chat Button
+                        IconButton(onClick = { viewModel.toggleVoice() }) {
+                            Icon(
+                                imageVector = if (state.isVoiceEnabled) Icons.Default.Hearing else Icons.Default.VolumeOff,
+                                contentDescription = "Toggle Voice Speaker",
+                                tint = if (state.isVoiceEnabled) Color(0xFF10B981) else Color.LightGray
+                            )
+                        }
+
+                        // Microphone/Mic Button
+                        IconButton(onClick = { viewModel.toggleMic() }) {
+                            Icon(
+                                imageVector = if (state.isMicEnabled) Icons.Default.Mic else Icons.Default.MicOff,
+                                contentDescription = "Toggle Microphone",
+                                tint = if (state.isMicEnabled) Color(0xFF10B981) else Color.LightGray
+                            )
+                        }
+                    }
+
                     IconButton(onClick = { viewModel.toggleSound() }) {
                         Icon(
                             imageVector = if (state.isSoundEnabled) Icons.Default.VolumeUp else Icons.Default.VolumeOff,
@@ -173,7 +214,10 @@ fun LudoBoard(
             ) {
                 // Top Row: Red Player (Left) & Green Player (Right)
                 Row(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 8.dp)
+                        .zIndex(2f),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -201,6 +245,7 @@ fun LudoBoard(
                         .background(Color.White, RoundedCornerShape(12.dp))
                         .border(4.dp, Color(0xFF1E293B), RoundedCornerShape(12.dp))
                         .clip(RoundedCornerShape(8.dp))
+                        .zIndex(1f)
                         .testTag("ludo_game_board")
                 ) {
                     val cellSize = boardSize / 15f
@@ -211,14 +256,27 @@ fun LudoBoard(
                     LudoBoardGrid(boardSize = boardSize, cellSize = cellSize, state = state)
 
                     // 2. Draw Tokens layered perfectly on top!
-                    // Group tokens by their actual position coordinates to stack/offset nicely
+                    // Group tokens by their actual position coordinates to stack/offset nicely.
+                    // If a token is actively moving, we treat it as its own separate group so it hops
+                    // cleanly over cells without disrupting the size/offset of stationary tokens!
                     val tokensGrouped = state.tokens.groupBy { token ->
-                        LudoCoordinates.getTokenCoordinates(token.playerId, token.id, token.position)
+                        val coord = LudoCoordinates.getTokenCoordinates(token.playerId, token.id, token.position)
+                        val isMovingThisToken = state.isMovingToken && 
+                                state.movingTokenId == token.id && 
+                                state.currentPlayerIdx == token.playerId
+                        
+                        val groupId = if (isMovingThisToken) {
+                            "moving_${token.playerId}_${token.id}"
+                        } else {
+                            "cell_${coord.first}_${coord.second}"
+                        }
+                        
+                        TokenGroupKey(coord.first, coord.second, groupId)
                     }
 
-                    tokensGrouped.forEach { (coord, tokenList) ->
-                        val baseRow = coord.first
-                        val baseCol = coord.second
+                    tokensGrouped.forEach { (key, tokenList) ->
+                        val baseRow = key.row
+                        val baseCol = key.col
 
                         tokenList.forEachIndexed { index, token ->
                             val isAtHome = token.position == 57
@@ -245,13 +303,18 @@ fun LudoBoard(
                             val c = baseCol + stackOffsetCol
 
                             // Determine clickability
+                            val isMyTurnToClick = if (state.gameMode == LudoGameMode.HYBRID_ONLINE) {
+                                token.playerId == viewModel.myFirebasePlayerSlot && state.currentPlayerIdx == viewModel.myFirebasePlayerSlot
+                            } else {
+                                token.playerId == currentPlayer?.id && currentPlayer?.type == PlayerType.HUMAN
+                            }
+
                             val isTokenClickable = state.gamePhase == GamePhase.PLAYING &&
                                     state.hasRolled &&
                                     !state.isRolling &&
                                     !state.isMovingToken &&
-                                    token.playerId == currentPlayer?.id &&
+                                    isMyTurnToClick &&
                                     state.diceRoll != null &&
-                                    state.players.firstOrNull { it.id == token.playerId }?.type == PlayerType.HUMAN &&
                                     token.position + state.diceRoll!! <= 57 &&
                                     (token.position > 0 || state.diceRoll == 6)
 
@@ -548,8 +611,8 @@ fun LudoBoard(
                                     .shadow(if (isTokenClickable) 8.dp else 4.dp, CircleShape)
                                     .background(token.color.value, CircleShape)
                                     .border(
-                                        width = if (isTokenClickable) 2.5.dp else 1.5.dp,
-                                        color = if (isTokenClickable) Color(0xFFFFD700) else Color.White,
+                                        width = if (isTokenClickable) 2.5.dp else if (tokenList.size > 1) 1.8.dp else 1.5.dp,
+                                        color = if (isTokenClickable) Color(0xFFFFD700) else if (tokenList.size > 1) Color(0xFF111827) else Color.White,
                                         shape = CircleShape
                                     )
                             }
@@ -606,16 +669,16 @@ fun LudoBoard(
                                         // Standard Ludo coin nested inner concentric ring
                                         Box(
                                             modifier = Modifier
-                                                .size(if (isAtHome) cellSize * 0.25f else if (tokenList.size > 1) cellSize * 0.32f else cellSize * 0.42f)
+                                                .size(if (isAtHome) cellSize * 0.25f else if (tokenList.size > 1) cellSize * 0.20f else cellSize * 0.42f)
                                                 .background(
                                                     brush = Brush.radialGradient(
-                                                        colors = listOf(Color(0xFFFFFFFF), Color(0xFFE0E0E0))
+                                                        colors = listOf(Color.White.copy(alpha = 0.75f), Color.White.copy(alpha = 0.2f))
                                                     ),
                                                     shape = CircleShape
                                                 )
                                                 .border(
-                                                    width = 1.2.dp,
-                                                    color = Color.White.copy(alpha = 0.9f),
+                                                    width = 1.dp,
+                                                    color = Color.White.copy(alpha = 0.85f),
                                                     shape = CircleShape
                                                 )
                                         )
@@ -631,7 +694,10 @@ fun LudoBoard(
 
                 // Bottom Row: Blue Player (Left) & Yellow Player (Right)
                 Row(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 8.dp)
+                        .zIndex(2f),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -669,7 +735,16 @@ fun LudoBoard(
                                 .height(26.dp)
                                 .shadow(if (isEligibleForSix || state.nextRollIsSix) 2.dp else 0.dp, RoundedCornerShape(13.dp))
                                 .clickable(enabled = isEligibleForSix || state.nextRollIsSix) {
-                                    viewModel.triggerAd(AdType.GUARANTEED_SIX)
+                                    if (isInternetAvailable(context)) {
+                                        viewModel.triggerAd(AdType.GUARANTEED_SIX)
+                                    } else {
+                                        val title = LudoTranslations.getTranslation("internet_required_title", state.selectedLanguage)
+                                        android.widget.Toast.makeText(
+                                            context,
+                                            title,
+                                            android.widget.Toast.LENGTH_SHORT
+                                        ).show()
+                                    }
                                 },
                             shape = RoundedCornerShape(13.dp),
                             colors = CardDefaults.cardColors(
@@ -780,6 +855,90 @@ fun LudoBoard(
                                 style = MaterialTheme.typography.bodyMedium
                             )
 
+                            if (state.gameMode == LudoGameMode.HYBRID_ONLINE) {
+                                Spacer(modifier = Modifier.height(12.dp))
+                                Text(
+                                    text = if (state.selectedLanguage.code.contains("hi")) "🤝 ऑनलाइन खिलाड़ियों को दोस्त बनाएं:" else "🤝 Add Online Players as Friends:",
+                                    color = Color(0xFFFFD700),
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 14.sp
+                                )
+                                
+                                val otherPlayers = state.players.filter { it.id != 3 }
+                                if (otherPlayers.isNotEmpty()) {
+                                    Column(
+                                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                                        modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp)
+                                    ) {
+                                        otherPlayers.forEach { player ->
+                                            val isAdded = state.addedFriends.contains(player.id)
+                                            Row(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .background(Color(0xFF2E2A72), RoundedCornerShape(12.dp))
+                                                    .border(1.dp, Color(0xFF4F46E5), RoundedCornerShape(12.dp))
+                                                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.SpaceBetween
+                                            ) {
+                                                Row(
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                                ) {
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .size(16.dp)
+                                                            .background(player.color.value, CircleShape)
+                                                    )
+                                                    Text(
+                                                        text = player.name,
+                                                        color = Color.White,
+                                                        fontWeight = FontWeight.Bold,
+                                                        fontSize = 14.sp
+                                                    )
+                                                }
+                                                
+                                                Button(
+                                                    onClick = {
+                                                        if (!isAdded) {
+                                                            viewModel.addFriend(player.name, player.id)
+                                                        }
+                                                    },
+                                                    colors = ButtonDefaults.buttonColors(
+                                                        containerColor = if (isAdded) Color(0xFF10B981) else Color(0xFFFFD700),
+                                                        contentColor = if (isAdded) Color.White else Color(0xFF0F172A)
+                                                    ),
+                                                    shape = RoundedCornerShape(8.dp),
+                                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                                                    modifier = Modifier.height(36.dp)
+                                                ) {
+                                                    Row(
+                                                        verticalAlignment = Alignment.CenterVertically,
+                                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                                    ) {
+                                                        if (isAdded) {
+                                                            Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(14.dp))
+                                                            Text(
+                                                                text = if (state.selectedLanguage.code.contains("hi")) "दोस्त बन गए" else "Friends",
+                                                                fontWeight = FontWeight.Bold,
+                                                                fontSize = 11.sp
+                                                            )
+                                                        } else {
+                                                            Icon(Icons.Default.PersonAdd, contentDescription = null, modifier = Modifier.size(14.dp))
+                                                            Text(
+                                                                text = if (state.selectedLanguage.code.contains("hi")) "दोस्त बनाएं" else "Add Friend",
+                                                                fontWeight = FontWeight.Bold,
+                                                                fontSize = 11.sp
+                                                            )
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
                             Spacer(modifier = Modifier.height(16.dp))
 
                             Button(
@@ -884,6 +1043,141 @@ fun LudoBoard(
         )
     }
 
+    if (showChatDialog) {
+        AlertDialog(
+            onDismissRequest = { showChatDialog = false },
+            title = {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Icon(Icons.Default.Chat, contentDescription = null, tint = Color(0xFFFFD700))
+                    Text(
+                        text = if (state.selectedLanguage.code.contains("hi")) "त्वरित चैट / Quick Chat" else "Quick Chat",
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 18.sp
+                    )
+                }
+            },
+            containerColor = Color(0xFF1E1B4B),
+            textContentColor = Color.White,
+            text = {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Text(
+                        text = if (state.selectedLanguage.code.contains("hi")) "एक संदेश चुनें:" else "Select a message:",
+                        color = Color.LightGray,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+
+                    val quickMessages = listOf(
+                        "Hello! 👋" to "हेलो! 👋",
+                        "Play fast! ⏳" to "जल्दी खेलो भाई! ⏳",
+                        "Oh no! 🤦‍♂️" to "अरे यार! 🤦‍♂️",
+                        "Congratulations! 🏆" to "बधाई हो! 🏆",
+                        "Wow! 😮" to "क्या बात है! 😮",
+                        "Amazing game! 🤩" to "मजा आ गया! 🤩",
+                        "Your turn! 🎲" to "चल भाई चाल चल! 🎲",
+                        "Good luck! 👍" to "शुभकामनाएं! 👍"
+                    )
+
+                    LazyColumn(
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.heightIn(max = 200.dp)
+                    ) {
+                        items(quickMessages) { (eng, hin) ->
+                            val msgText = if (state.selectedLanguage.code.contains("hi")) hin else eng
+                            Surface(
+                                onClick = {
+                                    viewModel.sendUserChatMessage(msgText)
+                                    showChatDialog = false
+                                },
+                                shape = RoundedCornerShape(10.dp),
+                                color = Color(0xFF2E2A72),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .border(1.dp, Color(0xFF4F46E5), RoundedCornerShape(10.dp))
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 14.dp, vertical = 10.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = msgText,
+                                        color = Color.White,
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    var customMsg by remember { mutableStateOf("") }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        OutlinedTextField(
+                            value = customMsg,
+                            onValueChange = { customMsg = it },
+                            placeholder = { Text("Type here...", color = Color.Gray, fontSize = 13.sp) },
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedTextColor = Color.White,
+                                unfocusedTextColor = Color.White,
+                                focusedBorderColor = Color(0xFFFFD700),
+                                unfocusedBorderColor = Color(0xFF4F46E5),
+                                focusedContainerColor = Color(0xFF0F172A),
+                                unfocusedContainerColor = Color(0xFF0F172A)
+                            ),
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(10.dp),
+                            singleLine = true
+                        )
+                        Button(
+                            onClick = {
+                                if (customMsg.isNotBlank()) {
+                                    viewModel.sendUserChatMessage(customMsg.trim())
+                                    customMsg = ""
+                                    showChatDialog = false
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color(0xFFFFD700),
+                                contentColor = Color(0xFF0F172A)
+                            ),
+                            shape = RoundedCornerShape(10.dp),
+                            contentPadding = PaddingValues(horizontal = 12.dp)
+                        ) {
+                            Text("Send", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                        }
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                TextButton(onClick = { showChatDialog = false }) {
+                    Text(
+                        text = if (state.selectedLanguage.code.contains("hi")) "बंद करें" else "Close",
+                        color = Color(0xFFFFD700),
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+        )
+    }
+
     // Interactive Sponsor Video Ad Player Dialog
     if (state.adType != null) {
         AlertDialog(
@@ -950,7 +1244,11 @@ fun LudoBoard(
         AlertDialog(
             onDismissRequest = {},
             title = {
-                Text("⏳ TIME IS UP! (समय समाप्त)", fontWeight = FontWeight.Bold, color = Color.White)
+                Text(
+                    text = if (state.selectedLanguage.code.contains("hi")) "⏳ समय समाप्त! (TIME IS UP)" else "⏳ TIME IS UP! (समय समाप्त)",
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
+                )
             },
             text = {
                 Column(
@@ -959,7 +1257,11 @@ fun LudoBoard(
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     Text(
-                        text = "The 5-minute match timer has run out! Would you like to extend the game by 5 more minutes by watching a sponsor ad?",
+                        text = if (state.selectedLanguage.code.contains("hi")) {
+                            "मैच का समय समाप्त हो गया है! क्या आप एक प्रायोजक विज्ञापन देखकर खेल को 5 मिनट और बढ़ाना चाहते हैं या गेम बंद करना चाहते हैं?"
+                        } else {
+                            "The match timer has run out! Would you like to extend the game by 5 more minutes by watching a sponsor ad, or quit the game?"
+                        },
                         color = Color.White.copy(alpha = 0.8f),
                         textAlign = TextAlign.Center
                     )
@@ -975,7 +1277,11 @@ fun LudoBoard(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Text("🎲 Watch Ad (+5 Min)", fontWeight = FontWeight.Black, color = Color.White)
+                            Text(
+                                text = if (state.selectedLanguage.code.contains("hi")) "🎲 विज्ञापन देखें (+5 मिनट)" else "🎲 Watch Ad (+5 Min)",
+                                fontWeight = FontWeight.Black,
+                                color = Color.White
+                            )
                         }
                     }
                 }
@@ -983,7 +1289,11 @@ fun LudoBoard(
             confirmButton = {},
             dismissButton = {
                 TextButton(onClick = { viewModel.dismissTimeUpDialog() }) {
-                    Text("End Match & See Winner", color = Color(0xFFE11D48), fontWeight = FontWeight.Bold)
+                    Text(
+                        text = if (state.selectedLanguage.code.contains("hi")) "गेम बंद करें (Exit Game)" else "Exit Game (गेम बंद करें)",
+                        color = Color(0xFFEF4444),
+                        fontWeight = FontWeight.Bold
+                    )
                 }
             },
             containerColor = Color(0xFF1E1B4B),
@@ -1455,7 +1765,16 @@ fun PlayerCornerCard(
                         overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(bottom = 2.dp),
+                            .padding(bottom = 1.dp),
+                        textAlign = TextAlign.Center
+                    )
+
+                    Text(
+                        text = "Lvl ${player.level}",
+                        color = Color(0xFFFFD700),
+                        fontWeight = FontWeight.Black,
+                        fontSize = 9.sp,
+                        modifier = Modifier.padding(bottom = 2.dp),
                         textAlign = TextAlign.Center
                     )
                     
@@ -1528,36 +1847,44 @@ fun PlayerCornerCard(
                                 }
                             }
 
-                            // 2. Compact Color dot indicating player color & type (Human vs Bot)
+                            // 2. Beautiful styled Avatar Sticker representing the player
+                            val avatar = ludoAvatars.firstOrNull { it.id == player.avatarId } ?: ludoAvatars[0]
                             Box(
                                 modifier = Modifier
-                                    .size(24.dp)
-                                    .background(player.color.value, CircleShape)
-                                    .border(1.5.dp, Color.White, CircleShape),
+                                    .size(28.dp)
+                                    .background(
+                                        brush = Brush.linearGradient(colors = avatar.gradient),
+                                        shape = CircleShape
+                                    )
+                                    .border(1.5.dp, avatar.frameColor, CircleShape),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(
-                                    imageVector = if (player.type == PlayerType.BOT) Icons.Default.Android else Icons.Default.Person,
+                                    imageVector = avatar.icon,
                                     contentDescription = null,
                                     tint = Color.White,
-                                    modifier = Modifier.size(13.dp)
+                                    modifier = Modifier.size(15.dp)
                                 )
                             }
                         } else {
                             // Left-side players: User / Bot profile icon first (outer edge), then Team label, then Dice / Pansa (inner edge)
-                            // 1. Compact Color dot indicating player color & type (Human vs Bot)
+                            // 1. Beautiful styled Avatar Sticker representing the player
+                            val avatar = ludoAvatars.firstOrNull { it.id == player.avatarId } ?: ludoAvatars[0]
                             Box(
                                 modifier = Modifier
-                                    .size(24.dp)
-                                    .background(player.color.value, CircleShape)
-                                    .border(1.5.dp, Color.White, CircleShape),
+                                    .size(28.dp)
+                                    .background(
+                                        brush = Brush.linearGradient(colors = avatar.gradient),
+                                        shape = CircleShape
+                                    )
+                                    .border(1.5.dp, avatar.frameColor, CircleShape),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(
-                                    imageVector = if (player.type == PlayerType.BOT) Icons.Default.Android else Icons.Default.Person,
+                                    imageVector = avatar.icon,
                                     contentDescription = null,
                                     tint = Color.White,
-                                    modifier = Modifier.size(13.dp)
+                                    modifier = Modifier.size(15.dp)
                                 )
                             }
 
@@ -1613,6 +1940,15 @@ fun PlayerCornerCard(
                     }
 
                     Text(
+                        text = "Lvl ${player.level}",
+                        color = Color(0xFFFFD700),
+                        fontWeight = FontWeight.Black,
+                        fontSize = 9.sp,
+                        modifier = Modifier.padding(top = 2.dp),
+                        textAlign = TextAlign.Center
+                    )
+
+                    Text(
                         text = displayName,
                         color = if (isCurrentTurn) Color(0xFFFFD700) else Color.White,
                         fontWeight = FontWeight.Bold,
@@ -1621,8 +1957,28 @@ fun PlayerCornerCard(
                         overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(top = 2.dp),
+                            .padding(top = 1.dp),
                         textAlign = TextAlign.Center
+                    )
+                }
+            }
+
+            // Beautiful Floating Chat Bubble overlay with smooth enter/exit animations to prevent jitter
+            androidx.compose.animation.AnimatedVisibility(
+                visible = !bubbleText.isNullOrEmpty(),
+                enter = androidx.compose.animation.fadeIn(animationSpec = tween(300)) + 
+                        androidx.compose.animation.scaleIn(initialScale = 0.8f, animationSpec = tween(300)),
+                exit = androidx.compose.animation.fadeOut(animationSpec = tween(250)) + 
+                       androidx.compose.animation.scaleOut(targetScale = 0.8f, animationSpec = tween(250)),
+                modifier = Modifier
+                    .align(if (isBottomPlayer) Alignment.TopCenter else Alignment.BottomCenter)
+                    .offset(y = if (isBottomPlayer) (-65).dp else 65.dp)
+                    .zIndex(10f)
+            ) {
+                if (bubbleText != null) {
+                    ChatBubble(
+                        message = bubbleText,
+                        isTopRow = !isBottomPlayer
                     )
                 }
             }

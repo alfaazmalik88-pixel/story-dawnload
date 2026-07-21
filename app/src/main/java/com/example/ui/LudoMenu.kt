@@ -43,6 +43,7 @@ import com.example.model.GamePhase
 import com.example.model.LudoColor
 import com.example.model.LudoTheme
 import com.example.model.LudoTokenStyle
+import androidx.activity.compose.BackHandler
 import com.example.model.LudoDiceStyle
 import com.example.model.LudoGameMode
 import com.example.model.LudoViewModel
@@ -299,6 +300,8 @@ fun LudoMenu(
                             modifier = Modifier.size(20.dp)
                         )
                     }
+
+
                 }
 
                 // Right: Rules and Settings
@@ -327,10 +330,10 @@ fun LudoMenu(
                             .background(Color(0x22FFFFFF), CircleShape)
                     ) {
                         Icon(
-                            imageVector = Icons.Default.Settings,
-                            contentDescription = "Settings",
+                            imageVector = Icons.Default.AccountCircle,
+                            contentDescription = "Profile & Settings",
                             tint = Color.White,
-                            modifier = Modifier.size(20.dp)
+                            modifier = Modifier.size(22.dp)
                         )
                     }
                 }
@@ -365,7 +368,8 @@ fun LudoMenu(
                                 ),
                                 shape = CircleShape
                             )
-                            .border(1.dp, Color(0xFFFFD700), CircleShape),
+                            .border(1.dp, Color(0xFFFFD700), CircleShape)
+                            .clickable { showSettingsDialog = true },
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
@@ -1511,7 +1515,7 @@ fun LudoMenu(
                                             )
                                             Spacer(modifier = Modifier.height(3.dp))
                                             Text(
-                                                text = if (uiState.selectedLanguage.code.contains("hi")) "🎁 नीचे से क्लेम करें या +500 कॉइन के लिए एड देखें!" else "🎁 Claim daily rewards or watch Ad to get +500 coins!",
+                                                text = if (uiState.selectedLanguage.code.contains("hi")) "🎁 नीचे से डेली इनाम क्लेम करें!" else "🎁 Claim daily rewards below!",
                                                 color = Color(0xFFFFD700),
                                                 fontWeight = FontWeight.Medium,
                                                 fontSize = 9.sp
@@ -1735,6 +1739,20 @@ fun LudoMenu(
         if (showSettingsDialog) {
             SettingsDialog(
                 selectedLanguage = uiState.selectedLanguage,
+                selectedMusicMode = uiState.selectedMusicMode,
+                onToggleMusicMode = { viewModel.toggleMusicMode() },
+                friendsList = uiState.friendsList,
+                winsComputer = uiState.winsComputer,
+                winsOneVsOne = uiState.winsOneVsOne,
+                winsOnline = uiState.winsOnline,
+                gameplaySpeed = uiState.gameplaySpeed,
+                onSetGameplaySpeed = { speed -> viewModel.setGameplaySpeed(speed) },
+                username = uiState.username,
+                onUpdateUsername = { name -> viewModel.updateUsername(name) },
+                bio = uiState.bio,
+                onUpdateBio = { bioText -> viewModel.updateBio(bioText) },
+                selectedAvatarId = uiState.selectedAvatarId,
+                onUpdateAvatarId = { avatarId -> viewModel.updateSelectedAvatarId(avatarId) },
                 onDismissRequest = { showSettingsDialog = false }
             )
         }
@@ -2055,6 +2073,38 @@ fun GameModeCard(
                     textAlign = TextAlign.Center,
                     maxLines = 1
                 )
+                if (isOnline) {
+                    val infiniteTransitionLobby = rememberInfiniteTransition(label = "lobby_pulse")
+                    val livePulseAlpha by infiniteTransitionLobby.animateFloat(
+                        initialValue = 0.3f,
+                        targetValue = 1f,
+                        animationSpec = infiniteRepeatable(
+                            animation = tween(800, easing = LinearEasing),
+                            repeatMode = RepeatMode.Reverse
+                        ),
+                        label = "livePulse"
+                    )
+                    Spacer(modifier = Modifier.height(3.dp))
+                    Row(
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(6.dp)
+                                .clip(androidx.compose.foundation.shape.CircleShape)
+                                .background(Color(0xFF10B981).copy(alpha = livePulseAlpha))
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = "1,452 PLAYERS LIVE 🟢",
+                            color = Color(0xFF047857),
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Black,
+                            letterSpacing = 0.5.sp
+                        )
+                    }
+                }
             }
         }
     }

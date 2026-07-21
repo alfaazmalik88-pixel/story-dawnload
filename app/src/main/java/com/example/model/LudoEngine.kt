@@ -37,7 +37,9 @@ data class Player(
     val name: String,
     val color: LudoColor,
     val type: PlayerType,
-    val isCompleted: Boolean = false
+    val isCompleted: Boolean = false,
+    val level: Int = 1,
+    val avatarId: Int = 0
 )
 
 data class Token(
