@@ -6,7 +6,7 @@ import kotlin.random.Random
 enum class LudoColor(val value: Color, val hex: String) {
     RED(Color(0xFFE53935), "#E53935"),
     GREEN(Color(0xFF4CAF50), "#4CAF50"),
-    YELLOW(Color(0xFFFBC02D), "#FBC02D"),
+    YELLOW(Color(0xFFEAB308), "#EAB308"),
     BLUE(Color(0xFF1E88E5), "#1E88E5")
 }
 

@@ -321,7 +321,7 @@ fun MatchmakingPlayerCard(
     isMe: Boolean,
     modifier: Modifier = Modifier
 ) {
-    val isConnected = player.type == PlayerType.HUMAN && !player.name.contains("Waiting")
+    val isConnected = !player.name.contains("Searching") && !player.name.contains("Waiting")
     val playerColor = player.color
     
     Column(

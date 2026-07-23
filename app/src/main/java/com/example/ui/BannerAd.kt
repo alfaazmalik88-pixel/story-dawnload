@@ -65,7 +65,7 @@ fun BannerAd(modifier: Modifier = Modifier) {
                 factory = { context ->
                     AdView(context).apply {
                         setAdSize(AdSize.BANNER)
-                        adUnitId = "ca-app-pub-6221583924605189/7574074542" // User's real AdMob ID
+                        adUnitId = "ca-app-pub-3940256099942544/6300978111" // Google AdMob Test Banner ID
                         adListener = object : AdListener() {
                             override fun onAdLoaded() {
                                 Log.d("AdMob", "Banner ad loaded successfully.")

@@ -359,25 +359,31 @@ fun LudoMenu(
                     modifier = Modifier.weight(1f)
                 ) {
                     // Avatar Circle (Small & Sleek)
+                    val currentMenuAvatar = ludoAvatars.firstOrNull { it.id == uiState.selectedAvatarId } ?: ludoAvatars[0]
                     Box(
                         modifier = Modifier
-                            .size(30.dp)
+                            .size(32.dp)
                             .background(
-                                brush = Brush.linearGradient(
-                                    colors = listOf(Color(0xFF3B82F6), Color(0xFF8B5CF6))
-                                ),
+                                brush = Brush.linearGradient(colors = currentMenuAvatar.gradient),
                                 shape = CircleShape
                             )
-                            .border(1.dp, Color(0xFFFFD700), CircleShape)
+                            .border(1.5.dp, currentMenuAvatar.frameColor, CircleShape)
                             .clickable { showSettingsDialog = true },
                         contentAlignment = Alignment.Center
                     ) {
-                        Text(
-                            text = if (uiState.username.isNotEmpty()) uiState.username.first().uppercase() else "L",
-                            color = Color.White,
-                            fontWeight = FontWeight.Black,
-                            fontSize = 13.sp
-                        )
+                        if (currentMenuAvatar.emoji != null) {
+                            Text(
+                                text = currentMenuAvatar.emoji,
+                                fontSize = 16.sp
+                            )
+                        } else {
+                            Icon(
+                                imageVector = currentMenuAvatar.icon,
+                                contentDescription = "Profile Avatar",
+                                tint = Color.White,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
                     }
 
                     // Username & Coins badge
@@ -1247,6 +1253,8 @@ fun LudoMenu(
                             icon = Icons.Default.Language,
                             gradientColors = listOf(Color(0xFFEF4444), Color(0xFFF97316)), // Vibrant Fire Red/Orange
                             testTag = "mode_hybrid_online",
+                            liveUsersCount = uiState.liveOnlineUsersCount,
+                            isHindi = uiState.selectedLanguage.code.contains("hi"),
                             onClick = {
                                 if (isInternetAvailable(context)) {
                                     viewModel.selectGameMode(LudoGameMode.HYBRID_ONLINE)
@@ -1282,11 +1290,7 @@ fun LudoMenu(
                             gradientColors = listOf(Color(0xFFD946EF), Color(0xFF8B5CF6)), // Purple/Magenta
                             testTag = "mode_1v1",
                             onClick = {
-                                if (isInternetAvailable(context)) {
-                                    viewModel.selectGameMode(LudoGameMode.ONE_VS_ONE)
-                                } else {
-                                    showNoInternetDialog = true
-                                }
+                                viewModel.selectGameMode(LudoGameMode.ONE_VS_ONE)
                             },
                             modifier = Modifier.weight(1f)
                         )
@@ -1515,7 +1519,7 @@ fun LudoMenu(
                                             )
                                             Spacer(modifier = Modifier.height(3.dp))
                                             Text(
-                                                text = if (uiState.selectedLanguage.code.contains("hi")) "🎁 नीचे से डेली इनाम क्लेम करें!" else "🎁 Claim daily rewards below!",
+                                                text = if (uiState.selectedLanguage.code.contains("hi")) "🎁 नीचे से डेली इनाम या रिवॉर्ड ऐड (Watch Ad) से कॉइन्स पाएं!" else "🎁 Claim daily rewards below or Watch Ad for free coins!",
                                                 color = Color(0xFFFFD700),
                                                 fontWeight = FontWeight.Medium,
                                                 fontSize = 9.sp
@@ -1557,11 +1561,7 @@ fun LudoMenu(
                     // PLAY button (Green, pill-shaped, glowing)
                     Button(
                         onClick = {
-                            if (uiState.gameMode == LudoGameMode.ONE_VS_ONE && !isInternetAvailable(context)) {
-                                showNoInternetDialog = true
-                            } else {
-                                viewModel.startGame()
-                            }
+                            viewModel.startGame()
                         },
                         modifier = Modifier
                             .weight(1f)
@@ -1589,20 +1589,6 @@ fun LudoMenu(
             }
 
             Spacer(modifier = Modifier.height(12.dp))
-
-            // Error or Status Warning Messages
-            AnimatedVisibility(
-                visible = uiState.statusMessage.startsWith("⚠️") || uiState.statusMessage.startsWith("❌"),
-                enter = fadeIn(),
-                exit = fadeOut()
-            ) {
-                Text(
-                    text = uiState.statusMessage,
-                    color = Color(0xFFEF4444),
-                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
-                    modifier = Modifier.padding(top = 8.dp)
-                )
-            }
 
             Spacer(modifier = Modifier.height(24.dp))
             Row(
@@ -1876,7 +1862,9 @@ fun GameModeCard(
     gradientColors: List<Color>,
     testTag: String,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    liveUsersCount: Int = 1,
+    isHindi: Boolean = false
 ) {
     val isOnline = testTag == "mode_hybrid_online"
     
@@ -2096,8 +2084,13 @@ fun GameModeCard(
                                 .background(Color(0xFF10B981).copy(alpha = livePulseAlpha))
                         )
                         Spacer(modifier = Modifier.width(4.dp))
+                        val countText = if (isHindi) {
+                            "$liveUsersCount ऑनलाइन खिलाड़ी 🟢"
+                        } else {
+                            "$liveUsersCount PLAYERS ONLINE 🟢"
+                        }
                         Text(
-                            text = "1,452 PLAYERS LIVE 🟢",
+                            text = countText,
                             color = Color(0xFF047857),
                             fontSize = 9.sp,
                             fontWeight = FontWeight.Black,

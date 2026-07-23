@@ -35,18 +35,24 @@ data class LudoAvatar(
     val nameHi: String,
     val gradient: List<Color>,
     val icon: androidx.compose.ui.graphics.vector.ImageVector,
-    val frameColor: Color
+    val frameColor: Color,
+    val emoji: String? = null
 )
 
 val ludoAvatars = listOf(
     LudoAvatar(0, "Classic", "क्लासिक", listOf(Color(0xFF3B82F6), Color(0xFF8B5CF6)), Icons.Default.Face, Color(0xFFFFD700)),
     LudoAvatar(1, "Pro Gamer", "प्रो गेमर", listOf(Color(0xFFEC4899), Color(0xFF8B5CF6)), Icons.Default.SportsEsports, Color(0xFF00FFFF)),
-    LudoAvatar(2, "King", "शाही", listOf(Color(0xFFFFD700), Color(0xFFF59E0B)), Icons.Default.WorkspacePremium, Color(0xFFFFD700)),
+    LudoAvatar(2, "King", "शाही राजा", listOf(Color(0xFFFFD700), Color(0xFFF59E0B)), Icons.Default.WorkspacePremium, Color(0xFFFFD700)),
     LudoAvatar(3, "Strategy", "रणनीति", listOf(Color(0xFF10B981), Color(0xFF059669)), Icons.Default.Psychology, Color(0xFF00FF87)),
     LudoAvatar(4, "Commander", "सेनापति", listOf(Color(0xFFEF4444), Color(0xFFB91C1C)), Icons.Default.MilitaryTech, Color(0xFFE5E7EB)),
     LudoAvatar(5, "Cosmic", "कॉस्मिक", listOf(Color(0xFF8B5CF6), Color(0xFF4C1D95)), Icons.Default.Star, Color(0xFFA5B4FC)),
     LudoAvatar(6, "Artist", "कलाकार", listOf(Color(0xFF06B6D4), Color(0xFF0891B2)), Icons.Default.Brush, Color(0xFFF97316)),
-    LudoAvatar(7, "Billionaire", "अरबपति", listOf(Color(0xFF1E293B), Color(0xFF0F172A)), Icons.Default.MonetizationOn, Color(0xFFFFD700))
+    LudoAvatar(7, "Billionaire", "अरबपति", listOf(Color(0xFF1E293B), Color(0xFF0F172A)), Icons.Default.MonetizationOn, Color(0xFFFFD700)),
+    LudoAvatar(8, "Lion King", "बब्बर शेर", listOf(Color(0xFFF59E0B), Color(0xFFB45309)), Icons.Default.Face, Color(0xFFFFD700), emoji = "🦁"),
+    LudoAvatar(9, "Black Panther", "ब्लैक पैंथर", listOf(Color(0xFF312E81), Color(0xFF0F172A)), Icons.Default.Face, Color(0xFF22D3EE), emoji = "🐆"),
+    LudoAvatar(10, "Love Queen", "लव क्वीन", listOf(Color(0xFFEC4899), Color(0xFFBE185D)), Icons.Default.Favorite, Color(0xFFF472B6), emoji = "👸"),
+    LudoAvatar(11, "Girl Power", "गर्ल पावर", listOf(Color(0xFFFB7185), Color(0xFFC026D3)), Icons.Default.Face, Color(0xFFF43F5E), emoji = "👧"),
+    LudoAvatar(12, "Love Heart", "प्यार दिल", listOf(Color(0xFFE11D48), Color(0xFF881337)), Icons.Default.Favorite, Color(0xFFFDA4AF), emoji = "💖")
 )
 
 @Composable
@@ -77,6 +83,8 @@ fun SettingsDialog(
 
     var showEditBioDialog by remember { mutableStateOf(false) }
     var editBioInput by remember { mutableStateOf(bio) }
+
+    var showAvatarSelectionDialog by remember { mutableStateOf(false) }
 
     val totalWins = winsComputer + winsOneVsOne + winsOnline
     val playerLevel = 1 + totalWins / 3
@@ -152,42 +160,90 @@ fun SettingsDialog(
                         ) {
                             // Avatar on Left with luxurious Glowing Gold double ring
                             val currentAvatar = ludoAvatars.firstOrNull { it.id == selectedAvatarId } ?: ludoAvatars[0]
-                            Box(
-                                modifier = Modifier
-                                    .size(80.dp)
-                                    .background(
-                                        brush = Brush.radialGradient(
-                                            colors = listOf(Color(0xFF2E1065), Color(0xFF0F0C20))
-                                        ),
-                                        shape = CircleShape
-                                    )
-                                    .border(2.5.dp, currentAvatar.frameColor, CircleShape)
-                                    .padding(4.dp)
-                                    .border(
-                                        width = 1.5.dp,
-                                        brush = Brush.linearGradient(
-                                            colors = listOf(Color(0xFFFFD700), Color(0xFFFFEFA6), Color(0xFFF59E0B))
-                                        ),
-                                        shape = CircleShape
-                                    ),
-                                contentAlignment = Alignment.Center
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(4.dp)
                             ) {
                                 Box(
                                     modifier = Modifier
-                                        .fillMaxSize()
+                                        .size(80.dp)
+                                        .clip(CircleShape)
+                                        .clickable {
+                                            showAvatarSelectionDialog = true
+                                        }
                                         .background(
-                                            brush = Brush.linearGradient(colors = currentAvatar.gradient),
+                                            brush = Brush.radialGradient(
+                                                colors = listOf(Color(0xFF2E1065), Color(0xFF0F0C20))
+                                            ),
                                             shape = CircleShape
-                                        ),
-                                    contentAlignment = Alignment.Center
+                                        )
+                                        .border(2.5.dp, currentAvatar.frameColor, CircleShape)
+                                        .padding(4.dp)
+                                        .border(
+                                            width = 1.5.dp,
+                                            brush = Brush.linearGradient(
+                                                colors = listOf(Color(0xFFFFD700), Color(0xFFFFEFA6), Color(0xFFF59E0B))
+                                            ),
+                                            shape = CircleShape
+                                        )
                                 ) {
-                                    Icon(
-                                        imageVector = currentAvatar.icon,
-                                        contentDescription = "Avatar Icon",
-                                        tint = Color.White,
-                                        modifier = Modifier.size(38.dp)
-                                    )
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .background(
+                                                brush = Brush.linearGradient(colors = currentAvatar.gradient),
+                                                shape = CircleShape
+                                            ),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        if (currentAvatar.emoji != null) {
+                                            Text(
+                                                text = currentAvatar.emoji,
+                                                fontSize = 32.sp
+                                            )
+                                        } else {
+                                            Icon(
+                                                imageVector = currentAvatar.icon,
+                                                contentDescription = "Avatar Icon",
+                                                tint = Color.White,
+                                                modifier = Modifier.size(38.dp)
+                                            )
+                                        }
+                                    }
+
+                                    // Small camera/edit badge at bottom right
+                                    Box(
+                                        modifier = Modifier
+                                            .align(Alignment.BottomEnd)
+                                            .size(24.dp)
+                                            .background(
+                                                brush = Brush.linearGradient(
+                                                    colors = listOf(Color(0xFFFFD700), Color(0xFFF59E0B))
+                                                ),
+                                                shape = CircleShape
+                                            )
+                                            .border(1.5.dp, Color(0xFF0F0C20), CircleShape),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.CameraAlt,
+                                            contentDescription = "Change Avatar",
+                                            tint = Color.Black,
+                                            modifier = Modifier.size(12.dp)
+                                        )
+                                    }
                                 }
+
+                                Text(
+                                    text = if (selectedLanguage.code.contains("hi")) "अवतार बदलें ✏️" else "Change Avatar ✏️",
+                                    color = Color(0xFFFFD700),
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(4.dp))
+                                        .clickable { showAvatarSelectionDialog = true }
+                                        .padding(horizontal = 4.dp, vertical = 2.dp)
+                                )
                             }
 
                             // Username & Level & Bio on Right
@@ -397,119 +453,6 @@ fun SettingsDialog(
                                 }
                             }
                         }
-                    }
-                }
-
-                // --- PROFILE AVATAR / STICKER SELECTION ---
-                SettingsSectionCard(
-                    title = if (selectedLanguage.code.contains("hi")) "🎭 प्रोफाइल अवतार (Profile Avatars)" else "🎭 Profile Avatars",
-                    icon = Icons.Default.Face,
-                    iconTint = Color(0xFF00FFFF)
-                ) {
-                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Text(
-                            text = if (selectedLanguage.code.contains("hi")) "अपना मनपसंद प्रीमियम अवतार चुनें (ये कार्टून नहीं हैं):" else "Select your favorite premium profile avatar (non-cartoon):",
-                            color = Color(0xFF94A3B8),
-                            fontSize = 12.sp,
-                            lineHeight = 16.sp
-                        )
-
-                        // 4 columns x 2 rows
-                        Column(
-                            verticalArrangement = Arrangement.spacedBy(8.dp),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            for (row in 0..1) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                ) {
-                                    for (col in 0..3) {
-                                        val index = row * 4 + col
-                                        if (index < ludoAvatars.size) {
-                                            val avatar = ludoAvatars[index]
-                                            val isSelected = selectedAvatarId == avatar.id
-                                            
-                                            Column(
-                                                horizontalAlignment = Alignment.CenterHorizontally,
-                                                modifier = Modifier
-                                                    .weight(1f)
-                                                    .clip(RoundedCornerShape(8.dp))
-                                                    .background(
-                                                        if (isSelected) Color(0xFF312E81) else Color(0xFF0F172A).copy(alpha = 0.5f)
-                                                    )
-                                                    .border(
-                                                        width = if (isSelected) 2.dp else 1.dp,
-                                                        color = if (isSelected) avatar.frameColor else Color.White.copy(alpha = 0.08f),
-                                                        shape = RoundedCornerShape(8.dp)
-                                                    )
-                                                    .clickable {
-                                                        onUpdateAvatarId(avatar.id)
-                                                    }
-                                                    .padding(vertical = 8.dp)
-                                            ) {
-                                                Box(
-                                                    modifier = Modifier
-                                                        .size(40.dp)
-                                                        .background(
-                                                            brush = Brush.linearGradient(colors = avatar.gradient),
-                                                            shape = CircleShape
-                                                        )
-                                                        .border(1.5.dp, avatar.frameColor, CircleShape),
-                                                    contentAlignment = Alignment.Center
-                                                ) {
-                                                    Icon(
-                                                        imageVector = avatar.icon,
-                                                        contentDescription = null,
-                                                        tint = Color.White,
-                                                        modifier = Modifier.size(20.dp)
-                                                    )
-                                                }
-                                                Spacer(modifier = Modifier.height(4.dp))
-                                                Text(
-                                                    text = if (selectedLanguage.code.contains("hi")) avatar.nameHi else avatar.nameEn,
-                                                    color = if (isSelected) Color.White else Color(0xFF94A3B8),
-                                                    fontSize = 8.sp,
-                                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                                    textAlign = TextAlign.Center,
-                                                    maxLines = 1
-                                                )
-                                            }
-                                        } else {
-                                            Spacer(modifier = Modifier.weight(1f))
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-
-                // --- MATCH STATISTICS ---
-                SettingsSectionCard(
-                    title = if (selectedLanguage.code.contains("hi")) "🏆 खेल सांख्यिकी (Stats)" else "🏆 Match Stats",
-                    icon = Icons.Default.EmojiEvents,
-                    iconTint = Color(0xFFFFD700)
-                ) {
-                    Column(
-                        verticalArrangement = Arrangement.spacedBy(10.dp),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        StatRow(
-                            label = if (selectedLanguage.code.contains("hi")) "🖥️ बनाम कंप्यूटर (Vs Computer)" else "🖥️ Vs Computer",
-                            wins = winsComputer,
-                            color = Color(0xFF3B82F6)
-                        )
-                        StatRow(
-                            label = if (selectedLanguage.code.contains("hi")) "⚔️ 1 बनाम 1 (1v1 Match)" else "⚔️ 1v1 Match",
-                            wins = winsOneVsOne,
-                            color = Color(0xFFEF4444)
-                        )
-                        StatRow(
-                            label = if (selectedLanguage.code.contains("hi")) "🌐 ऑनलाइन गेम (Online Game)" else "🌐 Online Game",
-                            wins = winsOnline,
-                            color = Color(0xFF10B981)
-                        )
                     }
                 }
 
@@ -850,6 +793,114 @@ fun SettingsDialog(
             },
             containerColor = Color(0xFF0F172A),
             shape = RoundedCornerShape(14.dp)
+        )
+    }
+
+    // Avatar Selection Dialog (triggers when clicking Avatar or "Change Avatar ✏️")
+    if (showAvatarSelectionDialog) {
+        AlertDialog(
+            onDismissRequest = { showAvatarSelectionDialog = false },
+            title = {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Face,
+                        contentDescription = null,
+                        tint = Color(0xFFFFD700)
+                    )
+                    Text(
+                        text = if (selectedLanguage.code.contains("hi")) "🎭 प्रोफाइल अवतार चुनें" else "🎭 Choose Profile Avatar",
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 18.sp
+                    )
+                }
+            },
+            text = {
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    ludoAvatars.chunked(3).forEach { avatarRow ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            for (avatar in avatarRow) {
+                                val isSelected = selectedAvatarId == avatar.id
+                                Column(
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .background(
+                                            if (isSelected) Color(0xFF312E81) else Color(0xFF1E293B)
+                                        )
+                                        .border(
+                                            width = if (isSelected) 2.dp else 1.dp,
+                                            color = if (isSelected) Color(0xFFFFD700) else Color(0xFF334155),
+                                            shape = RoundedCornerShape(12.dp)
+                                        )
+                                        .clickable {
+                                            onUpdateAvatarId(avatar.id)
+                                            showAvatarSelectionDialog = false
+                                        }
+                                        .padding(8.dp)
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(44.dp)
+                                            .background(
+                                                brush = Brush.linearGradient(colors = avatar.gradient),
+                                                shape = CircleShape
+                                            )
+                                            .border(1.5.dp, avatar.frameColor, CircleShape),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        if (avatar.emoji != null) {
+                                            Text(text = avatar.emoji, fontSize = 22.sp)
+                                        } else {
+                                            Icon(
+                                                imageVector = avatar.icon,
+                                                contentDescription = null,
+                                                tint = Color.White,
+                                                modifier = Modifier.size(22.dp)
+                                            )
+                                        }
+                                    }
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text(
+                                        text = if (selectedLanguage.code.contains("hi")) avatar.nameHi else avatar.nameEn,
+                                        color = if (isSelected) Color(0xFFFFD700) else Color.White,
+                                        fontSize = 10.sp,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                        textAlign = TextAlign.Center,
+                                        maxLines = 1
+                                    )
+                                }
+                            }
+                            if (avatarRow.size < 3) {
+                                repeat(3 - avatarRow.size) {
+                                    Spacer(modifier = Modifier.weight(1f))
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showAvatarSelectionDialog = false }) {
+                    Text(
+                        text = if (selectedLanguage.code.contains("hi")) "बंद करें" else "Close",
+                        color = Color(0xFFFFD700),
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            },
+            containerColor = Color(0xFF0F172A),
+            shape = RoundedCornerShape(16.dp)
         )
     }
 }

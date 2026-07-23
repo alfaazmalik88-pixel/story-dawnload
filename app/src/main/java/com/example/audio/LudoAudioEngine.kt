@@ -50,71 +50,82 @@ object LudoAudioEngine {
         if (bgmJob != null && bgmJob?.isActive == true) return
 
         bgmJob = audioScope.launch {
-            try {
-                val bufferSize = AudioTrack.getMinBufferSize(
-                    SAMPLE_RATE,
-                    AudioFormat.CHANNEL_OUT_MONO,
-                    AudioFormat.ENCODING_PCM_16BIT
-                ).coerceAtLeast(16384)
+            // Classic Upbeat Cheerful Ludo Theme Song Melody
+            val classicMelody = listOf(
+                Note(523.25, 200), Note(587.33, 200), Note(659.25, 200), Note(783.99, 400),
+                Note(659.25, 200), Note(587.33, 200), Note(523.25, 400), Note(392.00, 400),
+                Note(523.25, 200), Note(659.25, 200), Note(783.99, 200), Note(880.00, 400),
+                Note(783.99, 200), Note(659.25, 200), Note(587.33, 400), Note(523.25, 400),
+                Note(659.25, 200), Note(783.99, 200), Note(880.00, 200), Note(1046.50, 400),
+                Note(880.00, 200), Note(783.99, 200), Note(659.25, 400), Note(587.33, 400),
+                Note(523.25, 200), Note(587.33, 200), Note(659.25, 200), Note(783.99, 200),
+                Note(880.00, 200), Note(783.99, 200), Note(659.25, 200), Note(523.25, 600)
+            )
 
-                val track = AudioTrack.Builder()
-                    .setAudioAttributes(
-                        AudioAttributes.Builder()
-                            .setUsage(AudioAttributes.USAGE_MEDIA)
-                            .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
-                            .build()
-                    )
-                    .setAudioFormat(
-                        AudioFormat.Builder()
-                            .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
-                            .setSampleRate(SAMPLE_RATE)
-                            .setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
-                            .build()
-                    )
-                    .setBufferSizeInBytes(bufferSize)
-                    .setTransferMode(AudioTrack.MODE_STREAM)
-                    .build()
+            // Gulf / Middle-Eastern Arabian Oud Hijaz Scale melody list
+            val gulfMelody = listOf(
+                Note(392.0, 250), Note(415.3, 250), Note(493.9, 500),
+                Note(493.9, 250), Note(523.3, 250), Note(493.9, 250), Note(415.3, 250), Note(392.0, 500),
+                Note(493.9, 250), Note(523.3, 250), Note(587.3, 500),
+                Note(587.3, 250), Note(622.3, 250), Note(587.3, 250), Note(523.3, 250), Note(493.9, 500),
+                Note(587.3, 250), Note(523.3, 250), Note(493.9, 250), Note(415.3, 250), Note(392.0, 600)
+            )
 
-                bgmTrack = track
-                track.play()
+            var noteIndex = 0
 
-                // Classic Pentatonic melody list
-                val classicMelody = listOf(
-                    Note(261.6, 350), Note(293.7, 350), Note(329.6, 350), Note(392.0, 350),
-                    Note(329.6, 350), Note(293.7, 350), Note(261.6, 700),
-                    Note(329.6, 350), Note(392.0, 350), Note(440.0, 350), Note(523.3, 350),
-                    Note(440.0, 350), Note(392.0, 350), Note(329.6, 700),
-                    Note(392.0, 350), Note(440.0, 350), Note(523.3, 350), Note(587.3, 350),
-                    Note(523.3, 350), Note(440.0, 350), Note(392.0, 700),
-                    Note(440.0, 350), Note(392.0, 350), Note(329.6, 350), Note(293.7, 350),
-                    Note(329.6, 350), Note(293.7, 350), Note(261.6, 700)
-                )
-
-                // Gulf / Middle-Eastern Arabian Oud Hijaz Scale melody list
-                val gulfMelody = listOf(
-                    Note(392.0, 350), Note(415.3, 350), Note(493.9, 700),
-                    Note(493.9, 350), Note(523.3, 350), Note(493.9, 350), Note(415.3, 350), Note(392.0, 700),
-                    Note(493.9, 350), Note(523.3, 350), Note(587.3, 700),
-                    Note(587.3, 350), Note(622.3, 350), Note(587.3, 350), Note(523.3, 350), Note(493.9, 700),
-                    Note(587.3, 350), Note(523.3, 350), Note(493.9, 350), Note(415.3, 350), Note(392.0, 700)
-                )
-
-                var noteIndex = 0
-                while (isActive && isMusicEnabled) {
-                    val melody = if (currentMusicMode == "GULF") gulfMelody else classicMelody
-                    val note = melody[noteIndex % melody.size]
-                    writeToneToTrack(track, note.frequency, note.durationMs, volume = 0.15f, type = WaveType.TRIANGLE)
-                    noteIndex++
-                    delay(50) // Small break between notes
-                }
-            } catch (e: Exception) {
-                Log.e(TAG, "BGM Error", e)
-            } finally {
+            // Resilient infinite BGM loop - automatically recovers track if system audio drops
+            while (isActive && isMusicEnabled) {
+                var currentTrack: AudioTrack? = null
                 try {
-                    bgmTrack?.stop()
-                    bgmTrack?.release()
-                } catch (e: Exception) { /* ignore */ }
-                bgmTrack = null
+                    val bufferSize = AudioTrack.getMinBufferSize(
+                        SAMPLE_RATE,
+                        AudioFormat.CHANNEL_OUT_MONO,
+                        AudioFormat.ENCODING_PCM_16BIT
+                    ).coerceAtLeast(16384)
+
+                    val track = AudioTrack.Builder()
+                        .setAudioAttributes(
+                            AudioAttributes.Builder()
+                                .setUsage(AudioAttributes.USAGE_GAME)
+                                .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                                .build()
+                        )
+                        .setAudioFormat(
+                            AudioFormat.Builder()
+                                .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
+                                .setSampleRate(SAMPLE_RATE)
+                                .setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
+                                .build()
+                        )
+                        .setBufferSizeInBytes(bufferSize)
+                        .setTransferMode(AudioTrack.MODE_STREAM)
+                        .build()
+
+                    bgmTrack = track
+                    currentTrack = track
+                    track.play()
+
+                    while (isActive && isMusicEnabled) {
+                        val melody = if (currentMusicMode == "GULF") gulfMelody else classicMelody
+                        val note = melody[noteIndex % melody.size]
+                        writeToneToTrack(track, note.frequency, note.durationMs, volume = 0.15f, type = WaveType.TRIANGLE)
+                        noteIndex++
+                        delay(50) // Small break between notes
+                    }
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    Log.e(TAG, "BGM Error", e)
+                    delay(300)
+                } finally {
+                    try {
+                        currentTrack?.stop()
+                        currentTrack?.release()
+                    } catch (e: Exception) { /* ignore */ }
+                    if (bgmTrack == currentTrack) {
+                        bgmTrack = null
+                    }
+                }
             }
         }
     }
@@ -188,8 +199,8 @@ object LudoAudioEngine {
                 track = AudioTrack.Builder()
                     .setAudioAttributes(
                         AudioAttributes.Builder()
-                            .setUsage(AudioAttributes.USAGE_MEDIA)
-                            .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                            .setUsage(AudioAttributes.USAGE_GAME)
+                            .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
                             .build()
                     )
                     .setAudioFormat(
@@ -226,41 +237,46 @@ object LudoAudioEngine {
     }
 
     fun playTokenMove() {
-        // A clean, beautiful introductory slide-click sound (SINE wave)
-        playSequence(listOf(587.33, 880.0), listOf(30, 30), volume = 0.15f, type = WaveType.SINE)
+        // Crisp, clear wooden token pick-up sound
+        playSequence(listOf(750.0, 1050.0, 1350.0), listOf(20, 20, 25), volume = 0.40f, type = WaveType.SINE)
     }
 
     fun playTokenHop() {
-        // A short, extremely crisp, sweet, and clear retro step sound (SINE wave)
-        playSequence(listOf(880.0, 1174.66), listOf(35, 35), volume = 0.18f, type = WaveType.SINE)
+        // High-clarity wooden token step clack sound on the board ("Tuk" sound)
+        playSequence(listOf(1150.0, 1500.0), listOf(18, 22), volume = 0.45f, type = WaveType.SINE)
     }
 
     fun playTurnPass() {
         // Light double-blip
-        playSequence(listOf(523.3, 659.3), listOf(50, 70), volume = 0.15f, type = WaveType.SINE)
+        playSequence(listOf(523.3, 659.3), listOf(50, 70), volume = 0.25f, type = WaveType.SINE)
     }
 
     fun playAlert() {
         // Alarm-like dual sound
-        playSequence(listOf(880.0, 880.0, 880.0), listOf(80, 80, 80), volume = 0.15f, type = WaveType.SINE, gapMs = 40)
+        playSequence(listOf(880.0, 880.0, 880.0), listOf(80, 80, 80), volume = 0.30f, type = WaveType.SINE, gapMs = 40)
     }
 
     fun playDiceRoll() {
-        // Fast rumbling sound
-        playSequence(listOf(180.0, 240.0, 200.0, 310.0, 150.0), listOf(35, 35, 35, 35, 35), volume = 0.15f, type = WaveType.TRIANGLE)
+        // Highlighted, highly realistic, loud dice shaking & rolling sound ("Dish ki Awaj")
+        playSequence(
+            listOf(280.0, 720.0, 480.0, 920.0, 580.0, 1050.0, 410.0, 1250.0, 310.0, 1500.0, 220.0),
+            listOf(18, 18, 18, 18, 18, 18, 18, 20, 20, 25, 75),
+            volume = 0.70f,
+            type = WaveType.TRIANGLE
+        )
     }
 
     fun playTokenCaptured() {
-        // Downward slide sound
+        // High impact capture/cut sound
         val freqs = mutableListOf<Double>()
         val durs = mutableListOf<Int>()
-        var f = 800.0
-        while (f >= 150.0) {
+        var f = 1200.0
+        while (f >= 200.0) {
             freqs.add(f)
             durs.add(15)
-            f -= 50.0
+            f -= 70.0
         }
-        playSequence(freqs, durs, volume = 0.25f, type = WaveType.SQUARE)
+        playSequence(freqs, durs, volume = 0.40f, type = WaveType.SQUARE)
     }
 
     fun playVictory() {

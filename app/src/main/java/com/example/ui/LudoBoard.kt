@@ -65,11 +65,13 @@ fun LudoBoard(
     var showResetConfirmation by remember { mutableStateOf(false) }
     var showChatDialog by remember { mutableStateOf(false) }
 
+    val isWagerMode = state.gameMode == LudoGameMode.ONE_VS_ONE || state.gameMode == LudoGameMode.HYBRID_ONLINE
+
     BackHandler(enabled = true) {
         if (state.gamePhase == GamePhase.PLAYING) {
             showBackConfirmation = true
         } else {
-            onBack()
+            viewModel.triggerAd(AdType.GAME_FINISH)
         }
     }
 
@@ -77,7 +79,7 @@ fun LudoBoard(
     val infiniteTransition = rememberInfiniteTransition(label = "pulse")
     val pulseScale by infiniteTransition.animateFloat(
         initialValue = 1f,
-        targetValue = 1.12f,
+        targetValue = 1.20f,
         animationSpec = infiniteRepeatable(
             animation = tween(800, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Reverse
@@ -123,15 +125,14 @@ fun LudoBoard(
                         if (state.gamePhase == GamePhase.PLAYING) {
                             showBackConfirmation = true
                         } else {
-                            onBack()
+                            viewModel.triggerAd(AdType.GAME_FINISH)
                         }
                     }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
                 },
                 actions = {
-                    val isOnlineOrWagerMode = state.gameMode == LudoGameMode.ONE_VS_ONE || state.gameMode == LudoGameMode.HYBRID_ONLINE
-                    if (isOnlineOrWagerMode) {
+                    if (state.gameMode == LudoGameMode.HYBRID_ONLINE) {
                         // Chat Button
                         IconButton(onClick = { showChatDialog = true }) {
                             Icon(
@@ -280,27 +281,33 @@ fun LudoBoard(
 
                         tokenList.forEachIndexed { index, token ->
                             val isAtHome = token.position == 57
-                            // Calculate dynamic stack offset if multiple tokens land on same spot
-                            val stackOffsetRow = if (tokenList.size > 1 && !isAtHome) {
-                                when (index) {
-                                    0 -> -0.15f
-                                    1 -> 0.15f
-                                    2 -> -0.15f
-                                    else -> 0.15f
-                                }
-                            } else 0f
 
-                            val stackOffsetCol = if (tokenList.size > 1 && !isAtHome) {
-                                when (index) {
-                                    0 -> -0.15f
-                                    1 -> -0.15f
-                                    2 -> 0.15f
-                                    else -> 0.15f
+                            // Precise sub-grid offsets within 1x1 cell to prevent clipping at edges/corners
+                            val (cellOffsetRelX, cellOffsetRelY, tokenSizeFactor) = when {
+                                isAtHome -> Triple(0.20f, 0.20f, 0.60f)
+                                tokenList.size == 1 -> Triple(0.10f, 0.10f, 0.80f)
+                                tokenList.size == 2 -> when (index) {
+                                    0 -> Triple(0.04f, 0.04f, 0.48f)
+                                    else -> Triple(0.48f, 0.48f, 0.48f)
                                 }
-                            } else 0f
+                                tokenList.size == 3 -> when (index) {
+                                    0 -> Triple(0.04f, 0.04f, 0.46f)
+                                    1 -> Triple(0.50f, 0.04f, 0.46f)
+                                    else -> Triple(0.27f, 0.50f, 0.46f)
+                                }
+                                else -> when (index) {
+                                    0 -> Triple(0.04f, 0.04f, 0.45f)
+                                    1 -> Triple(0.51f, 0.04f, 0.45f)
+                                    2 -> Triple(0.04f, 0.51f, 0.45f)
+                                    else -> Triple(0.51f, 0.51f, 0.45f)
+                                }
+                            }
 
-                            val r = baseRow + stackOffsetRow
-                            val c = baseCol + stackOffsetCol
+                            val rawCellX = baseCol + cellOffsetRelX
+                            val rawCellY = baseRow + cellOffsetRelY
+
+                            val clampedCellX = rawCellX.coerceIn(0.02f, 14.98f - tokenSizeFactor)
+                            val clampedCellY = rawCellY.coerceIn(0.02f, 14.98f - tokenSizeFactor)
 
                             // Determine clickability
                             val isMyTurnToClick = if (state.gameMode == LudoGameMode.HYBRID_ONLINE) {
@@ -329,8 +336,8 @@ fun LudoBoard(
                                 1 -> Brush.radialGradient( // GREEN
                                     colors = listOf(Color(0xFF86FA8B), Color(0xFF2E7D32), Color(0xFF0D3710))
                                 )
-                                2 -> Brush.radialGradient( // YELLOW
-                                    colors = listOf(Color(0xFFFFF176), Color(0xFFFBC02D), Color(0xFF8F5100))
+                                2 -> Brush.radialGradient( // YELLOW - High contrast warm golden amber with rich dark border
+                                    colors = listOf(Color(0xFFFFEA00), Color(0xFFEAB308), Color(0xFF78350F))
                                 )
                                 else -> Brush.radialGradient( // BLUE
                                     colors = listOf(Color(0xFF64D8FF), Color(0xFF1565C0), Color(0xFF08254E))
@@ -339,7 +346,7 @@ fun LudoBoard(
 
                             val metallicBorder = if (isTokenClickable) {
                                 Brush.linearGradient(
-                                    colors = listOf(Color(0xFFFFDF73), Color(0xFFD4AF37), Color(0xFFFFDF73), Color(0xFF8A640F), Color(0xFFFFDF73))
+                                    colors = listOf(Color(0xFFFFF5A0), Color(0xFFFFD700), Color(0xFFFFF5A0), Color(0xFFB45309), Color(0xFFFFD700))
                                 )
                             } else {
                                 Brush.linearGradient(
@@ -347,53 +354,10 @@ fun LudoBoard(
                                 )
                             }
 
-                            val normalSize = if (isAtHome) {
-                                cellSize * 0.58f
-                            } else if (tokenList.size > 1) {
-                                cellSize * 0.54f
-                            } else {
-                                cellSize * 0.88f
-                            }
+                            val normalSize = cellSize * tokenSizeFactor
 
-                            val pawnWidth = if (isAtHome) {
-                                cellSize * 0.42f
-                            } else if (tokenList.size > 1) {
-                                cellSize * 0.38f
-                            } else {
-                                cellSize * 0.64f
-                            }
-                            val pawnHeight = pawnWidth * 1.35f
-
-                            val sizeFraction = if (isAtHome) {
-                                0.58f
-                            } else if (tokenList.size > 1) {
-                                0.54f
-                            } else {
-                                0.88f
-                            }
-
-                            val cellOffsetX = if (isAtHome) {
-                                0.21f
-                            } else if (tokenList.size > 1) {
-                                0.23f
-                            } else {
-                                0.06f
-                            }
-
-                            val cellOffsetY = if (isAtHome) {
-                                0.21f
-                            } else if (tokenList.size > 1) {
-                                0.23f
-                            } else {
-                                0.06f
-                            }
-
-                            val rawCellX = c + cellOffsetX
-                            val rawCellY = r + cellOffsetY
-
-                            // Coerce within 0 and 15 - sizeFraction so it never bleeds out of the board boundaries
-                            val clampedCellX = rawCellX.coerceIn(0f, 15f - sizeFraction)
-                            val clampedCellY = rawCellY.coerceIn(0f, 15f - sizeFraction)
+                            val pawnWidth = normalSize * 0.72f
+                            val pawnHeight = pawnWidth * 1.25f
 
                             val baseModifier = Modifier
                                 .size(normalSize)
@@ -405,10 +369,21 @@ fun LudoBoard(
 
                             val tokenModifier = if (state.selectedTokenStyle == LudoTokenStyle.GLOSSY_3D) {
                                 baseModifier
-                                    .shadow(if (isTokenClickable) 8.dp else 4.dp, CircleShape, spotColor = Color.Black)
+                                    .shadow(if (isTokenClickable) 10.dp else 3.dp, CircleShape, spotColor = Color.Black)
                                     .drawBehind {
                                         val radius = size.minDimension / 2
                                         val centerPt = Offset(size.width / 2, size.height / 2)
+
+                                        // 0. Golden Glowing Aura Ring for playable tokens ("Saini" highlight)
+                                        if (isTokenClickable) {
+                                            drawCircle(
+                                                brush = Brush.radialGradient(
+                                                    colors = listOf(Color(0xFFFFD700).copy(alpha = 0.85f), Color(0xFFFFD700).copy(alpha = 0.0f))
+                                                ),
+                                                radius = radius * 1.55f,
+                                                center = centerPt
+                                            )
+                                        }
 
                                         // 1. Draw background radial gradient circle
                                         drawCircle(
@@ -422,16 +397,16 @@ fun LudoBoard(
                                             brush = metallicBorder,
                                             radius = radius - 1.dp.toPx(),
                                             style = androidx.compose.ui.graphics.drawscope.Stroke(
-                                                width = if (isTokenClickable) 3.dp.toPx() else 1.8.dp.toPx()
+                                                width = if (isTokenClickable) 3.5.dp.toPx() else 1.8.dp.toPx()
                                             ),
                                             center = centerPt
                                         )
 
                                         // 3. Inner border accent for elegant depth
                                         drawCircle(
-                                            color = Color.White.copy(alpha = 0.25f),
-                                            radius = radius - (if (isTokenClickable) 4.dp.toPx() else 3.dp.toPx()),
-                                            style = androidx.compose.ui.graphics.drawscope.Stroke(width = 0.8.dp.toPx()),
+                                            color = Color.White.copy(alpha = 0.35f),
+                                            radius = radius - (if (isTokenClickable) 4.5.dp.toPx() else 3.dp.toPx()),
+                                            style = androidx.compose.ui.graphics.drawscope.Stroke(width = 0.9.dp.toPx()),
                                             center = centerPt
                                         )
 
@@ -447,7 +422,6 @@ fun LudoBoard(
                                                 startAngleDegrees = 180f,
                                                 sweepAngleDegrees = 180f
                                             )
-                                            // Curve back across the middle
                                             quadraticTo(
                                                 x1 = centerPt.x,
                                                 y1 = centerPt.y + radius * 0.15f,
@@ -460,7 +434,7 @@ fun LudoBoard(
                                             path = glassPath,
                                             brush = Brush.verticalGradient(
                                                 colors = listOf(
-                                                    Color.White.copy(alpha = 0.45f),
+                                                    Color.White.copy(alpha = 0.50f),
                                                     Color.White.copy(alpha = 0.0f)
                                                 ),
                                                 startY = centerPt.y - radius,
@@ -470,7 +444,7 @@ fun LudoBoard(
 
                                         // 5. Bright highlight pin-point / dot reflect (top-left)
                                         drawCircle(
-                                            color = Color.White.copy(alpha = 0.85f),
+                                            color = Color.White.copy(alpha = 0.90f),
                                             radius = 2.2.dp.toPx(),
                                             center = Offset(centerPt.x - radius * 0.42f, centerPt.y - radius * 0.42f)
                                         )
@@ -498,12 +472,23 @@ fun LudoBoard(
                                         val (lightColor, mainColor, darkColor, strokeColor) = when (token.playerId) {
                                             0 -> listOf(Color(0xFFFF7A68), Color(0xFFE0362A), Color(0xFF7A1710), Color(0xFF6B1109)) // RED
                                             1 -> listOf(Color(0xFF6DE79A), Color(0xFF22A85C), Color(0xFF0C4D29), Color(0xFF0A3A1E)) // GREEN
-                                            2 -> listOf(Color(0xFFFFEF9E), Color(0xFFEAB308), Color(0xFF7A5804), Color(0xFF5C4404)) // YELLOW
+                                            2 -> listOf(Color(0xFFFFF066), Color(0xFFEAB308), Color(0xFFB45309), Color(0xFF451A03)) // YELLOW (High Contrast)
                                             else -> listOf(Color(0xFF7CC4FF), Color(0xFF2470C4), Color(0xFF0F3255), Color(0xFF0D2745)) // BLUE
                                         }
 
-                                        val strokeWidth = if (isTokenClickable) 2.2.dp.toPx() else 1.2.dp.toPx()
+                                        val strokeWidth = if (isTokenClickable) 2.5.dp.toPx() else 1.2.dp.toPx()
                                         val finalStrokeColor = if (isTokenClickable) Color(0xFFFFD700) else strokeColor
+
+                                        // 0. Glowing aura behind pawn if playable
+                                        if (isTokenClickable) {
+                                            drawCircle(
+                                                brush = Brush.radialGradient(
+                                                    colors = listOf(Color(0xFFFFD700).copy(alpha = 0.80f), Color(0xFFFFD700).copy(alpha = 0.0f))
+                                                ),
+                                                radius = w * 0.95f,
+                                                center = Offset(w * 0.5f, h * 0.5f)
+                                            )
+                                        }
 
                                         // 1. Draw soft radial shadow at the bottom
                                         val shadowCx = w * 0.5f
@@ -607,12 +592,13 @@ fun LudoBoard(
                                         )
                                     }
                             } else {
+                                val normalBorderColor = if (token.playerId == 2) Color(0xFF78350F) else if (tokenList.size > 1) Color(0xFF111827) else Color.White
                                 baseModifier
-                                    .shadow(if (isTokenClickable) 8.dp else 4.dp, CircleShape)
+                                    .shadow(if (isTokenClickable) 10.dp else 4.dp, CircleShape)
                                     .background(token.color.value, CircleShape)
                                     .border(
-                                        width = if (isTokenClickable) 2.5.dp else if (tokenList.size > 1) 1.8.dp else 1.5.dp,
-                                        color = if (isTokenClickable) Color(0xFFFFD700) else if (tokenList.size > 1) Color(0xFF111827) else Color.White,
+                                        width = if (isTokenClickable) 3.dp else if (tokenList.size > 1) 1.8.dp else 1.5.dp,
+                                        color = if (isTokenClickable) Color(0xFFFFD700) else normalBorderColor,
                                         shape = CircleShape
                                     )
                             }
@@ -964,6 +950,7 @@ fun LudoBoard(
     }
 
     if (showBackConfirmation) {
+        val descKey = if (isWagerMode) "back_confirm_desc" else "back_confirm_desc_no_wager"
         AlertDialog(
             onDismissRequest = { showBackConfirmation = false },
             title = {
@@ -975,7 +962,7 @@ fun LudoBoard(
             },
             text = {
                 Text(
-                    text = LudoTranslations.getTranslation("back_confirm_desc", state.selectedLanguage),
+                    text = LudoTranslations.getTranslation(descKey, state.selectedLanguage),
                     color = Color.White.copy(alpha = 0.8f)
                 )
             },
@@ -1077,6 +1064,11 @@ fun LudoBoard(
                     )
 
                     val quickMessages = listOf(
+                        "🦁 Lion Roar! 💪" to "🦁 शेर की दहाड़! 💪",
+                        "🐆 Black Panther! ⚡" to "🐆 ब्लैक पैंथर चाल! ⚡",
+                        "👸 Love Queen! 💖" to "👸 लव क्वीन लव! 💖",
+                        "👧 Girl Power! 🎀" to "👧 गर्ल पावर! 🎀",
+                        "💖 Love You All! 💕" to "💖 प्यार भरा खेल! 💕",
                         "Hello! 👋" to "हेलो! 👋",
                         "Play fast! ⏳" to "जल्दी खेलो भाई! ⏳",
                         "Oh no! 🤦‍♂️" to "अरे यार! 🤦‍♂️",
@@ -2003,6 +1995,20 @@ fun PlayerCornerCard(
 
 @Composable
 fun DiceFace(value: Int, tint: Color, style: LudoDiceStyle, modifier: Modifier = Modifier) {
+    val isYellow = tint == LudoColor.YELLOW.value || (tint.red > 0.8f && tint.green > 0.65f && tint.blue < 0.4f)
+    val dotColor = if (isYellow) Color(0xFF78350F) else tint
+    val dotBorder = if (isYellow) Color(0xFFEAB308) else Color.White.copy(alpha = 0.4f)
+
+    @Composable
+    fun Dot(sizeDp: androidx.compose.ui.unit.Dp) {
+        Box(
+            modifier = Modifier
+                .size(sizeDp)
+                .background(dotColor, CircleShape)
+                .border(0.6.dp, dotBorder, CircleShape)
+        )
+    }
+
     Box(
         modifier = modifier
             .padding(4.dp),
@@ -2012,58 +2018,58 @@ fun DiceFace(value: Int, tint: Color, style: LudoDiceStyle, modifier: Modifier =
             LudoDiceStyle.CLASSIC_DOTS -> {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     when (value) {
-                        1 -> Box(modifier = Modifier.size(6.dp).background(tint, CircleShape))
+                        1 -> Dot(6.dp)
                         2 -> {
                             Column(verticalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxSize().padding(2.dp)) {
-                                Box(modifier = Modifier.size(5.dp).background(tint, CircleShape).align(Alignment.Start))
-                                Box(modifier = Modifier.size(5.dp).background(tint, CircleShape).align(Alignment.End))
+                                Box(modifier = Modifier.align(Alignment.Start)) { Dot(5.dp) }
+                                Box(modifier = Modifier.align(Alignment.End)) { Dot(5.dp) }
                             }
                         }
                         3 -> {
                             Box(modifier = Modifier.fillMaxSize().padding(2.dp)) {
-                                Box(modifier = Modifier.size(4.dp).background(tint, CircleShape).align(Alignment.TopStart))
-                                Box(modifier = Modifier.size(4.dp).background(tint, CircleShape).align(Alignment.Center))
-                                Box(modifier = Modifier.size(4.dp).background(tint, CircleShape).align(Alignment.BottomEnd))
+                                Box(modifier = Modifier.align(Alignment.TopStart)) { Dot(4.dp) }
+                                Box(modifier = Modifier.align(Alignment.Center)) { Dot(4.dp) }
+                                Box(modifier = Modifier.align(Alignment.BottomEnd)) { Dot(4.dp) }
                             }
                         }
                         4 -> {
                             Column(verticalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxSize().padding(2.dp)) {
                                 Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
-                                    Box(modifier = Modifier.size(4.dp).background(tint, CircleShape))
-                                    Box(modifier = Modifier.size(4.dp).background(tint, CircleShape))
+                                    Dot(4.dp)
+                                    Dot(4.dp)
                                 }
                                 Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
-                                    Box(modifier = Modifier.size(4.dp).background(tint, CircleShape))
-                                    Box(modifier = Modifier.size(4.dp).background(tint, CircleShape))
+                                    Dot(4.dp)
+                                    Dot(4.dp)
                                 }
                             }
                         }
                         5 -> {
                             Box(modifier = Modifier.fillMaxSize().padding(2.dp)) {
                                 Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth().align(Alignment.TopCenter)) {
-                                    Box(modifier = Modifier.size(4.dp).background(tint, CircleShape))
-                                    Box(modifier = Modifier.size(4.dp).background(tint, CircleShape))
+                                    Dot(4.dp)
+                                    Dot(4.dp)
                                 }
-                                Box(modifier = Modifier.size(4.dp).background(tint, CircleShape).align(Alignment.Center))
+                                Box(modifier = Modifier.align(Alignment.Center)) { Dot(4.dp) }
                                 Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth().align(Alignment.BottomCenter)) {
-                                    Box(modifier = Modifier.size(4.dp).background(tint, CircleShape))
-                                    Box(modifier = Modifier.size(4.dp).background(tint, CircleShape))
+                                    Dot(4.dp)
+                                    Dot(4.dp)
                                 }
                             }
                         }
                         6 -> {
                             Column(verticalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxSize().padding(2.dp)) {
                                 Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
-                                    Box(modifier = Modifier.size(4.dp).background(tint, CircleShape))
-                                    Box(modifier = Modifier.size(4.dp).background(tint, CircleShape))
+                                    Dot(4.dp)
+                                    Dot(4.dp)
                                 }
                                 Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
-                                    Box(modifier = Modifier.size(4.dp).background(tint, CircleShape))
-                                    Box(modifier = Modifier.size(4.dp).background(tint, CircleShape))
+                                    Dot(4.dp)
+                                    Dot(4.dp)
                                 }
                                 Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
-                                    Box(modifier = Modifier.size(4.dp).background(tint, CircleShape))
-                                    Box(modifier = Modifier.size(4.dp).background(tint, CircleShape))
+                                    Dot(4.dp)
+                                    Dot(4.dp)
                                 }
                             }
                         }
@@ -2080,7 +2086,7 @@ fun DiceFace(value: Int, tint: Color, style: LudoDiceStyle, modifier: Modifier =
                         text = "$value",
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Black,
-                        color = tint
+                        color = if (isYellow) Color(0xFFB45309) else tint
                     )
                 }
             }
