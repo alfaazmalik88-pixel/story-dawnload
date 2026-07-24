@@ -1,8 +1,10 @@
 package com.example.audio
 
+import android.content.Context
 import android.media.AudioAttributes
 import android.media.AudioFormat
 import android.media.AudioTrack
+import android.media.MediaPlayer
 import android.util.Log
 import kotlinx.coroutines.*
 import java.util.concurrent.Executors
@@ -20,8 +22,14 @@ object LudoAudioEngine {
     private val sfxExecutor = Executors.newSingleThreadExecutor()
     private val sfxDispatcher = sfxExecutor.asCoroutineDispatcher()
 
+    private var mediaPlayer: MediaPlayer? = null
     private var bgmTrack: AudioTrack? = null
     private var bgmJob: Job? = null
+    private var appContext: Context? = null
+
+    fun init(context: Context) {
+        appContext = context.applicationContext
+    }
 
     var isMusicEnabled: Boolean = true
         set(value) {
@@ -45,11 +53,74 @@ object LudoAudioEngine {
             }
         }
 
-    fun startBgm() {
+    fun startBgm(context: Context? = appContext) {
+        if (context != null) {
+            appContext = context.applicationContext
+        }
         if (!isMusicEnabled) return
         if (bgmJob != null && bgmJob?.isActive == true) return
 
         bgmJob = audioScope.launch {
+            val ctx = appContext
+            var startedMp = false
+
+            if (ctx != null) {
+                try {
+                    val rawNames = listOf("marketplace_at_noon", "marketplace", "bgm", "ludo_bgm", "music", "theme", "ludo_theme", "background")
+                    var foundRawId = 0
+                    for (name in rawNames) {
+                        val id = ctx.resources.getIdentifier(name, "raw", ctx.packageName)
+                        if (id != 0) {
+                            foundRawId = id
+                            break
+                        }
+                    }
+
+                    if (foundRawId != 0) {
+                        withContext(Dispatchers.Main) {
+                            mediaPlayer?.release()
+                            mediaPlayer = MediaPlayer.create(ctx, foundRawId)?.apply {
+                                isLooping = true
+                                setVolume(0.6f, 0.6f)
+                                start()
+                            }
+                        }
+                        if (mediaPlayer != null) {
+                            startedMp = true
+                        }
+                    }
+
+                    if (!startedMp) {
+                        val assetNames = listOf("marketplace_at_noon.mp3", "marketplace.mp3", "bgm.mp3", "music.mp3", "ludo_bgm.mp3", "theme.mp3", "bgm.wav", "bgm.ogg")
+                        for (assetName in assetNames) {
+                            try {
+                                val afd = ctx.assets.openFd(assetName)
+                                withContext(Dispatchers.Main) {
+                                    mediaPlayer?.release()
+                                    mediaPlayer = MediaPlayer().apply {
+                                        setDataSource(afd.fileDescriptor, afd.startOffset, afd.length)
+                                        afd.close()
+                                        isLooping = true
+                                        setVolume(0.6f, 0.6f)
+                                        prepare()
+                                        start()
+                                    }
+                                }
+                                if (mediaPlayer != null) {
+                                    startedMp = true
+                                    break
+                                }
+                            } catch (e: Exception) {
+                                // asset not found, try next
+                            }
+                        }
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed to load raw/asset audio via MediaPlayer", e)
+                }
+            }
+
+            if (startedMp) return@launch
             // Classic Upbeat Cheerful Ludo Theme Song Melody
             val classicMelody = listOf(
                 Note(523.25, 200), Note(587.33, 200), Note(659.25, 200), Note(783.99, 400),
@@ -62,13 +133,27 @@ object LudoAudioEngine {
                 Note(880.00, 200), Note(783.99, 200), Note(659.25, 200), Note(523.25, 600)
             )
 
-            // Gulf / Middle-Eastern Arabian Oud Hijaz Scale melody list
+            // Gulf / Middle-Eastern Arabian Oud Hijaz Scale melody list (Rich, catchy game melody)
             val gulfMelody = listOf(
-                Note(392.0, 250), Note(415.3, 250), Note(493.9, 500),
-                Note(493.9, 250), Note(523.3, 250), Note(493.9, 250), Note(415.3, 250), Note(392.0, 500),
-                Note(493.9, 250), Note(523.3, 250), Note(587.3, 500),
-                Note(587.3, 250), Note(622.3, 250), Note(587.3, 250), Note(523.3, 250), Note(493.9, 500),
-                Note(587.3, 250), Note(523.3, 250), Note(493.9, 250), Note(415.3, 250), Note(392.0, 600)
+                // Section A: Festive Gulf Oud Opening Motif (Bouncy game intro)
+                Note(392.0, 180), Note(415.3, 180), Note(493.9, 360), // G4, Ab4, B4
+                Note(493.9, 180), Note(523.3, 180), Note(493.9, 180), Note(415.3, 180), Note(392.0, 360), // B4, C5, B4, Ab4, G4
+                Note(392.0, 180), Note(415.3, 180), Note(493.9, 180), Note(523.3, 180), Note(587.3, 360), // G4, Ab4, B4, C5, D5
+                Note(587.3, 180), Note(622.3, 180), Note(587.3, 180), Note(523.3, 180), Note(493.9, 360), // D5, Eb5, D5, C5, B4
+
+                // Section B: Bouncy Gulf Game Rhythm Climb
+                Note(493.9, 180), Note(523.3, 180), Note(587.3, 180), Note(622.3, 180), Note(739.99, 360), // B4, C5, D5, Eb5, F#5
+                Note(783.99, 250), Note(739.99, 180), Note(622.3, 180), Note(587.3, 360), // G5, F#5, Eb5, D5
+                Note(587.3, 180), Note(523.3, 180), Note(493.9, 180), Note(415.3, 180), Note(392.0, 500), // D5, C5, B4, Ab4, G4
+
+                // Section C: Fast Trills & Festive Arabian Cadence
+                Note(392.0, 150), Note(493.9, 150), Note(587.3, 150), Note(783.99, 300), // G4, B4, D5, G5
+                Note(739.99, 150), Note(622.3, 150), Note(587.3, 150), Note(523.3, 150), Note(493.9, 300), // F#5, Eb5, D5, C5, B4
+                Note(415.3, 150), Note(493.9, 150), Note(523.3, 150), Note(493.9, 150), Note(415.3, 150), Note(392.0, 450), // Ab4, B4, C5, B4, Ab4, G4
+
+                // Section D: Ending Resolution Bounce
+                Note(392.0, 180), Note(587.3, 180), Note(392.0, 180), Note(587.3, 180), // G4, D5, G4, D5
+                Note(493.9, 180), Note(523.3, 180), Note(415.3, 180), Note(392.0, 600)  // B4, C5, Ab4, G4
             )
 
             var noteIndex = 0
@@ -106,11 +191,18 @@ object LudoAudioEngine {
                     track.play()
 
                     while (isActive && isMusicEnabled) {
-                        val melody = if (currentMusicMode == "GULF") gulfMelody else classicMelody
+                        val isGulf = currentMusicMode == "GULF"
+                        val melody = if (isGulf) gulfMelody else classicMelody
                         val note = melody[noteIndex % melody.size]
-                        writeToneToTrack(track, note.frequency, note.durationMs, volume = 0.15f, type = WaveType.TRIANGLE)
+                        
+                        if (isGulf) {
+                            writeOudToneToTrack(track, note.frequency, note.durationMs, volume = 0.28f)
+                        } else {
+                            writeToneToTrack(track, note.frequency, note.durationMs, volume = 0.15f, type = WaveType.TRIANGLE)
+                        }
+                        
                         noteIndex++
-                        delay(50) // Small break between notes
+                        delay(if (isGulf) 30 else 50) // Crisp articulation interval
                     }
                 } catch (e: CancellationException) {
                     throw e
@@ -133,13 +225,19 @@ object LudoAudioEngine {
     fun stopBgm() {
         bgmJob?.cancel()
         bgmJob = null
+        try {
+            mediaPlayer?.stop()
+            mediaPlayer?.release()
+        } catch (e: Exception) { /* ignore */ }
+        mediaPlayer = null
+
         bgmTrack?.let {
             try {
                 it.stop()
                 it.release()
             } catch (e: Exception) { /* ignore */ }
+            bgmTrack = null
         }
-        bgmTrack = null
     }
 
     private fun writeToneToTrack(
@@ -171,6 +269,46 @@ object LudoAudioEngine {
             val env = when {
                 i < attackSamples -> (i.toFloat() / attackSamples)
                 else -> (1.0f - (i - attackSamples).toFloat() / decaySamples).coerceIn(0f, 1f)
+            }
+
+            samples[i] = (waveVal * Short.MAX_VALUE * volume * env).toInt()
+                .coerceIn(Short.MIN_VALUE.toInt(), Short.MAX_VALUE.toInt()).toShort()
+        }
+        track.write(samples, 0, numSamples)
+    }
+
+    private fun writeOudToneToTrack(
+        track: AudioTrack,
+        frequency: Double,
+        durationMs: Int,
+        volume: Float = 0.28f
+    ) {
+        val numSamples = (SAMPLE_RATE * (durationMs / 1000.0)).toInt()
+        if (numSamples <= 0) return
+        val samples = ShortArray(numSamples)
+
+        val attackMs = 10.0
+        val attackSamples = (SAMPLE_RATE * (attackMs / 1000.0)).toInt().coerceIn(1, numSamples)
+
+        for (i in 0 until numSamples) {
+            val t = i.toDouble() / SAMPLE_RATE
+            val angle = 2.0 * Math.PI * frequency * t
+
+            // Oud / Qanun oriental string harmonics synthesis:
+            // Fundamental + 2nd octave + 3rd harmonic + subtle 4th
+            val fundamental = Math.sin(angle)
+            val oct1 = 0.45 * Math.sin(2.0 * angle)
+            val oct2 = 0.20 * Math.sin(3.0 * angle)
+            val oct3 = 0.10 * Math.sin(4.0 * angle)
+
+            val waveVal = (fundamental + oct1 + oct2 + oct3) / 1.75
+
+            // Plucked string envelope: sharp attack, natural exponential release
+            val env = if (i < attackSamples) {
+                (i.toFloat() / attackSamples)
+            } else {
+                val progress = (i - attackSamples).toDouble() / (numSamples - attackSamples)
+                Math.exp(-2.6 * progress).toFloat()
             }
 
             samples[i] = (waveVal * Short.MAX_VALUE * volume * env).toInt()

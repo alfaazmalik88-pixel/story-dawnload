@@ -41,6 +41,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import com.example.model.*
 import kotlinx.coroutines.delay
 
@@ -72,6 +74,16 @@ fun LudoBoard(
             showBackConfirmation = true
         } else {
             viewModel.triggerAd(AdType.GAME_FINISH)
+        }
+    }
+
+    val micPermissionLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        contract = androidx.activity.result.contract.ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            viewModel.enableMic(context)
+        } else {
+            android.widget.Toast.makeText(context, "Microphone permission required for voice chat", android.widget.Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -132,31 +144,49 @@ fun LudoBoard(
                     }
                 },
                 actions = {
-                    if (state.gameMode == LudoGameMode.HYBRID_ONLINE) {
-                        // Chat Button
-                        IconButton(onClick = { showChatDialog = true }) {
-                            Icon(
-                                imageVector = Icons.Default.Chat,
-                                contentDescription = "Quick Chat",
-                                tint = Color(0xFFFFD700)
-                            )
-                        }
+                    // Chat Button
+                    IconButton(onClick = { showChatDialog = true }) {
+                        Icon(
+                            imageVector = Icons.Default.Chat,
+                            contentDescription = "Quick Chat",
+                            tint = Color(0xFFFFD700)
+                        )
+                    }
 
-                        // Speaker/Voice Chat Button
-                        IconButton(onClick = { viewModel.toggleVoice() }) {
-                            Icon(
-                                imageVector = if (state.isVoiceEnabled) Icons.Default.Hearing else Icons.Default.VolumeOff,
-                                contentDescription = "Toggle Voice Speaker",
-                                tint = if (state.isVoiceEnabled) Color(0xFF10B981) else Color.LightGray
-                            )
-                        }
+                    // Speaker/Voice Chat Button
+                    IconButton(onClick = { viewModel.toggleVoice() }) {
+                        Icon(
+                            imageVector = if (state.isVoiceEnabled) Icons.Default.Hearing else Icons.Default.VolumeOff,
+                            contentDescription = "Toggle Voice Speaker",
+                            tint = if (state.isVoiceEnabled) Color(0xFF10B981) else Color.LightGray
+                        )
+                    }
 
-                        // Microphone/Mic Button
-                        IconButton(onClick = { viewModel.toggleMic() }) {
+                    // Microphone/Mic Button with live amplitude glow
+                    IconButton(onClick = {
+                        if (state.isMicEnabled) {
+                            viewModel.disableMic()
+                        } else {
+                            if (androidx.core.content.ContextCompat.checkSelfPermission(context, android.Manifest.permission.RECORD_AUDIO) == android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                                viewModel.enableMic(context)
+                            } else {
+                                micPermissionLauncher.launch(android.Manifest.permission.RECORD_AUDIO)
+                            }
+                        }
+                    }) {
+                        Box(contentAlignment = Alignment.Center) {
+                            if (state.isMicEnabled) {
+                                val glowAlpha = (state.micAmplitude * 0.8f + 0.3f).coerceIn(0.3f, 1f)
+                                Surface(
+                                    modifier = Modifier.size(32.dp),
+                                    shape = CircleShape,
+                                    color = Color(0xFF10B981).copy(alpha = glowAlpha)
+                                ) {}
+                            }
                             Icon(
                                 imageVector = if (state.isMicEnabled) Icons.Default.Mic else Icons.Default.MicOff,
                                 contentDescription = "Toggle Microphone",
-                                tint = if (state.isMicEnabled) Color(0xFF10B981) else Color.LightGray
+                                tint = if (state.isMicEnabled) Color.White else Color.LightGray
                             )
                         }
                     }
@@ -1170,65 +1200,184 @@ fun LudoBoard(
         )
     }
 
-    // Interactive Sponsor Video Ad Player Dialog
+    // Interactive Fullscreen Interstitial Sponsor Ad Player Overlay
     if (state.adType != null) {
-        AlertDialog(
+        Dialog(
             onDismissRequest = {},
-            title = {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(24.dp),
-                        color = Color(0xFFFFD700),
-                        strokeWidth = 2.5.dp
-                    )
-                    Text(LudoTranslations.getTranslation("watching_ad", state.selectedLanguage), fontWeight = FontWeight.Bold, color = Color.White, fontSize = 16.sp)
-                }
-            },
-            text = {
+            properties = DialogProperties(usePlatformDefaultWidth = false)
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color(0xFF0F172A))
+            ) {
+                // Background Glow Effects
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(
+                            Brush.radialGradient(
+                                colors = listOf(Color(0xFF312E81), Color(0xFF0F172A)),
+                                radius = 900f
+                            )
+                        )
+                )
+
                 Column(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(24.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                    verticalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Text(
-                        text = when (state.adType) {
-                            AdType.GUARANTEED_SIX -> LudoTranslations.getTranslation("ad_guaranteed_six", state.selectedLanguage)
-                            AdType.EXTEND_TIME -> LudoTranslations.getTranslation("ad_extend_time", state.selectedLanguage)
-                            AdType.GAME_FINISH -> LudoTranslations.getTranslation("ad_game_finish", state.selectedLanguage)
-                            AdType.RESET -> LudoTranslations.getTranslation("ad_reset", state.selectedLanguage)
-                            else -> LudoTranslations.getTranslation("ad_watching", state.selectedLanguage)
-                        },
-                        color = Color.White.copy(alpha = 0.8f),
-                        textAlign = TextAlign.Center
-                    )
+                    // Top Bar: Interstitial Tag & Countdown
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 16.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Surface(
+                            shape = RoundedCornerShape(20.dp),
+                            color = Color(0xFF1E1B4B),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF6366F1))
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(8.dp)
+                                        .clip(CircleShape)
+                                        .background(Color(0xFF10B981))
+                                )
+                                Text(
+                                    text = "🎬 SPONSORED AD",
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White
+                                )
+                            }
+                        }
 
-                    Text(
-                        text = LudoTranslations.getTranslation("reward_claims", state.selectedLanguage).replace("%d", state.adSecondsLeft.toString()),
-                        fontWeight = FontWeight.Black,
-                        fontSize = 24.sp,
-                        color = Color(0xFFFFD700)
-                    )
+                        // Close / Skip Button or Timer Badge
+                        Surface(
+                            shape = RoundedCornerShape(20.dp),
+                            color = Color(0xFFFFD700),
+                            modifier = Modifier.clickable { viewModel.dismissAd() }
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Text(
+                                    text = if (state.adSecondsLeft > 0) "Skip in ${state.adSecondsLeft}s ✕" else "Close ✕",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Black,
+                                    color = Color(0xFF0F172A)
+                                )
+                            }
+                        }
+                    }
 
-                    LinearProgressIndicator(
-                        progress = { (5f - state.adSecondsLeft) / 5f },
+                    // Center Content: Interstitial Video/Sponsor Card
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f)
+                            .padding(vertical = 20.dp),
+                        shape = RoundedCornerShape(24.dp),
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1B4B)),
+                        border = androidx.compose.foundation.BorderStroke(2.dp, Color(0xFFFFD700))
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(
+                                    Brush.verticalGradient(
+                                        colors = listOf(Color(0xFF3730A3), Color(0xFF1E1B4B))
+                                    )
+                                )
+                                .padding(20.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(16.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.PlayCircle,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(72.dp),
+                                    tint = Color(0xFFFFD700)
+                                )
+
+                                Text(
+                                    text = when (state.adType) {
+                                        AdType.GUARANTEED_SIX -> LudoTranslations.getTranslation("ad_guaranteed_six", state.selectedLanguage)
+                                        AdType.EXTEND_TIME -> LudoTranslations.getTranslation("ad_extend_time", state.selectedLanguage)
+                                        AdType.GAME_FINISH -> LudoTranslations.getTranslation("ad_game_finish", state.selectedLanguage)
+                                        AdType.RESET -> LudoTranslations.getTranslation("ad_reset", state.selectedLanguage)
+                                        else -> LudoTranslations.getTranslation("ad_watching", state.selectedLanguage)
+                                    },
+                                    fontSize = 18.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White,
+                                    textAlign = TextAlign.Center
+                                )
+
+                                Surface(
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = Color.Black.copy(alpha = 0.4f),
+                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                                ) {
+                                    Text(
+                                        text = LudoTranslations.getTranslation("reward_claims", state.selectedLanguage).replace("%d", state.adSecondsLeft.toString()),
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color(0xFFFFD700),
+                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                                    )
+                                }
+
+                                CircularProgressIndicator(
+                                    color = Color(0xFFFFD700),
+                                    strokeWidth = 3.dp,
+                                    modifier = Modifier.size(36.dp)
+                                )
+                            }
+                        }
+                    }
+
+                    // Bottom Bar Progress Indicator
+                    Column(
                         modifier = Modifier.fillMaxWidth(),
-                        color = Color(0xFFFFD700),
-                        trackColor = Color.White.copy(alpha = 0.2f),
-                    )
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        LinearProgressIndicator(
+                            progress = { (5f - state.adSecondsLeft) / 5f },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(8.dp)
+                                .clip(RoundedCornerShape(4.dp)),
+                            color = Color(0xFFFFD700),
+                            trackColor = Color.White.copy(alpha = 0.2f)
+                        )
+
+                        Text(
+                            text = "Sponsored Interstitial Video Ad",
+                            fontSize = 10.sp,
+                            color = Color.White.copy(alpha = 0.5f)
+                        )
+                    }
                 }
-            },
-            confirmButton = {
-                TextButton(onClick = { viewModel.dismissAd() }) {
-                    Text("Skip Ad", color = Color.White.copy(alpha = 0.6f))
-                }
-            },
-            containerColor = Color(0xFF1E1B4B),
-            titleContentColor = Color.White,
-            textContentColor = Color.White
-        )
+            }
+        }
     }
 
     // Time's Up Reward Dialog (Extend Time)

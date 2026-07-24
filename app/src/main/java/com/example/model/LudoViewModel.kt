@@ -3,6 +3,7 @@ package com.example.model
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.audio.LudoAudioEngine
+import com.example.audio.RealtimeVoiceManager
 import kotlinx.coroutines.delay
 import com.google.firebase.FirebaseApp
 import com.google.firebase.database.FirebaseDatabase
@@ -632,6 +633,8 @@ data class LudoState(
     val isSoundEnabled: Boolean = true,
     val isMicEnabled: Boolean = false,
     val isVoiceEnabled: Boolean = true,
+    val micAmplitude: Float = 0f,
+    val isSpeaking: Boolean = false,
     val timeLeftSeconds: Int = 300,
     val selectedTheme: LudoTheme = LudoTheme.CLASSIC,
     val selectedLanguage: LudoLanguage = LudoLanguage.EN,
@@ -844,6 +847,18 @@ class LudoViewModel : ViewModel() {
                 bio = bio,
                 selectedAvatarId = selectedAvatarId
             )
+        }
+
+        // Collect real-time microphone amplitude & speaking status
+        viewModelScope.launch {
+            RealtimeVoiceManager.micAmplitude.collect { amp ->
+                _uiState.update { it.copy(micAmplitude = amp) }
+            }
+        }
+        viewModelScope.launch {
+            RealtimeVoiceManager.isSpeaking.collect { speaking ->
+                _uiState.update { it.copy(isSpeaking = speaking) }
+            }
         }
 
         // Initialize Firebase safely
@@ -1196,11 +1211,42 @@ class LudoViewModel : ViewModel() {
         }
     }
 
-    fun toggleMic() {
+    fun enableMic(context: android.content.Context) {
+        RealtimeVoiceManager.startMicRecording(context)
+        sharedPrefs?.edit()?.putBoolean("is_mic_enabled", true)?.apply()
         _uiState.update { 
-            val nextMic = !it.isMicEnabled
-            sharedPrefs?.edit()?.putBoolean("is_mic_enabled", nextMic)?.apply()
-            it.copy(isMicEnabled = nextMic)
+            it.copy(
+                isMicEnabled = true,
+                statusMessage = "🎙️ Real-time Microphone ACTIVE! Speak into your phone."
+            )
+        }
+    }
+
+    fun disableMic() {
+        RealtimeVoiceManager.stopMicRecording()
+        sharedPrefs?.edit()?.putBoolean("is_mic_enabled", false)?.apply()
+        _uiState.update { 
+            it.copy(
+                isMicEnabled = false,
+                micAmplitude = 0f,
+                isSpeaking = false,
+                statusMessage = "🎙️ Microphone Muted."
+            )
+        }
+    }
+
+    fun toggleMic(context: android.content.Context? = null) {
+        val currentMic = _uiState.value.isMicEnabled
+        if (!currentMic) {
+            if (context != null) {
+                enableMic(context)
+            } else if (appContext != null) {
+                enableMic(appContext!!)
+            } else {
+                _uiState.update { it.copy(isMicEnabled = true) }
+            }
+        } else {
+            disableMic()
         }
     }
 
@@ -1208,7 +1254,19 @@ class LudoViewModel : ViewModel() {
         _uiState.update { 
             val nextVoice = !it.isVoiceEnabled
             sharedPrefs?.edit()?.putBoolean("is_voice_enabled", nextVoice)?.apply()
-            it.copy(isVoiceEnabled = nextVoice)
+            if (nextVoice) {
+                RealtimeVoiceManager.speakAnnouncer("Voice speaker active", true)
+                it.copy(
+                    isVoiceEnabled = true,
+                    statusMessage = "🔊 Real-time Speaker Voice Chat ACTIVE!"
+                )
+            } else {
+                RealtimeVoiceManager.stopAnnouncer()
+                it.copy(
+                    isVoiceEnabled = false,
+                    statusMessage = "🔊 Voice Speaker Muted."
+                )
+            }
         }
     }
 
@@ -1461,6 +1519,9 @@ class LudoViewModel : ViewModel() {
 
         // Clockwise sorting so turns cycle correctly in order
         players.sortBy { it.id }
+
+        // Start background music for gameplay
+        LudoAudioEngine.startBgm()
 
         // 3. Add tokens for each active player
         for (player in players) {
@@ -1932,6 +1993,8 @@ class LudoViewModel : ViewModel() {
 
         val opponentNames = players.filter { it.id != myFirebasePlayerSlot }.joinToString(", ") { it.name }
 
+        LudoAudioEngine.startBgm()
+
         _uiState.update { currentState ->
             currentState.copy(
                 gamePhase = GamePhase.PLAYING,
@@ -2063,6 +2126,7 @@ class LudoViewModel : ViewModel() {
         )
 
         val currentMode = uiState.value.gameMode
+        LudoAudioEngine.startBgm()
         _uiState.update { currentState ->
             currentState.copy(
                 gamePhase = GamePhase.PLAYING,

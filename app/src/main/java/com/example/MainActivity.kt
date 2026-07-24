@@ -24,6 +24,11 @@ import com.example.ui.CoinRedeemOverlay
 import com.example.ui.LudoMatchmakingScreen
 import androidx.compose.foundation.layout.Box
 import com.example.ui.theme.MyApplicationTheme
+import com.startapp.sdk.adsbase.Ad
+import com.startapp.sdk.adsbase.StartAppAd
+import com.startapp.sdk.adsbase.StartAppSDK
+import com.startapp.sdk.adsbase.adlisteners.AdDisplayListener
+import com.startapp.sdk.adsbase.adlisteners.AdEventListener
 import com.google.android.gms.ads.AdError
 import com.google.android.gms.ads.AdRequest
 import com.google.android.gms.ads.FullScreenContentCallback
@@ -41,6 +46,7 @@ class MainActivity : ComponentActivity() {
 
   private var mInterstitialAd: InterstitialAd? = null
   private var mRewardedAd: RewardedAd? = null
+  private var startAppAd: StartAppAd? = null
 
   private var isInterstitialLoading = false
   private var isRewardedLoading = false
@@ -50,6 +56,19 @@ class MainActivity : ComponentActivity() {
     
     // Initialize user profile preferences and daily rewards
     viewModel.initPrefs(this)
+    LudoAudioEngine.init(applicationContext)
+    com.example.audio.RealtimeVoiceManager.init(applicationContext)
+
+    // Initialize Start.io Ads SDK with App ID 206275910
+    try {
+      StartAppSDK.init(this, "206275910", false)
+      StartAppSDK.enableReturnAds(false)
+      StartAppAd.disableSplash()
+      startAppAd = StartAppAd(this)
+      Log.d("StartIO", "Start.io SDK initialized with App ID 206275910")
+    } catch (e: Exception) {
+      Log.e("StartIO", "Error initializing Start.io SDK: ${e.message}")
+    }
     
     // Initialize Mobile Ads SDK
     MobileAds.initialize(this) {
@@ -62,55 +81,37 @@ class MainActivity : ComponentActivity() {
       viewModel.uiState.collectLatest { state ->
         val adType = state.adType
         if (adType != null) {
-          if (adType == AdType.GAME_FINISH || adType == AdType.RESET) {
-            val ad = mInterstitialAd
-            if (ad != null) {
-              mInterstitialAd = null // Consume immediately
-              viewModel.onRealAdStarted()
-              runOnUiThread {
-                ad.fullScreenContentCallback = object : FullScreenContentCallback() {
-                  override fun onAdDismissedFullScreenContent() {
-                    loadInterstitialAd() // Preload next
-                    viewModel.onRealAdCompleted(adType)
-                  }
-
-                  override fun onAdFailedToShowFullScreenContent(adError: AdError) {
-                    mInterstitialAd = null
-                    Log.e("AdMob", "Interstitial ad failed to show: ${adError.message}")
-                    // Fallback to simulated countdown
-                  }
-                }
-                ad.show(this@MainActivity)
-              }
-            }
-          } else if (adType == AdType.GUARANTEED_SIX || adType == AdType.EXTEND_TIME || adType == AdType.WATCH_AD) {
-            val ad = mRewardedAd
-            if (ad != null) {
-              mRewardedAd = null // Consume immediately
-              viewModel.onRealAdStarted()
-              runOnUiThread {
-                var rewardEarned = false
-                ad.fullScreenContentCallback = object : FullScreenContentCallback() {
-                  override fun onAdDismissedFullScreenContent() {
-                    loadRewardedAd() // Preload next
-                    if (rewardEarned) {
-                      viewModel.onRealAdCompleted(adType)
-                    } else {
-                      viewModel.dismissAd()
+          // 1. Try displaying Start.io Ad
+          val sAd = startAppAd
+          if (sAd != null) {
+            sAd.loadAd(object : AdEventListener {
+              override fun onReceiveAd(ad: Ad) {
+                viewModel.onRealAdStarted()
+                runOnUiThread {
+                  sAd.showAd(object : AdDisplayListener {
+                    override fun adDisplayed(ad: Ad) {
+                      Log.d("StartIO", "Start.io ad displayed.")
                     }
-                  }
-
-                  override fun onAdFailedToShowFullScreenContent(adError: AdError) {
-                    mRewardedAd = null
-                    Log.e("AdMob", "Rewarded ad failed to show: ${adError.message}")
-                    // Fallback to simulated countdown
-                  }
-                }
-                ad.show(this@MainActivity) { rewardItem ->
-                  rewardEarned = true
+                    override fun adHidden(ad: Ad) {
+                      Log.d("StartIO", "Start.io ad hidden/completed.")
+                      viewModel.onRealAdCompleted(adType)
+                    }
+                    override fun adClicked(ad: Ad) {}
+                    override fun adNotDisplayed(ad: Ad) {
+                      Log.w("StartIO", "Start.io ad not displayed, falling back to AdMob")
+                      showAdMobOrLocal(adType)
+                    }
+                  })
                 }
               }
-            }
+
+              override fun onFailedToReceiveAd(ad: Ad?) {
+                Log.e("StartIO", "Start.io ad failed to load: ${ad?.errorMessage}")
+                showAdMobOrLocal(adType)
+              }
+            })
+          } else {
+            showAdMobOrLocal(adType)
           }
         }
       }
@@ -166,12 +167,63 @@ class MainActivity : ComponentActivity() {
 
   override fun onStart() {
     super.onStart()
-    LudoAudioEngine.startBgm()
+    LudoAudioEngine.startBgm(this)
   }
 
   override fun onStop() {
     super.onStop()
     LudoAudioEngine.stopBgm()
+  }
+
+  private fun showAdMobOrLocal(adType: AdType) {
+    if (adType == AdType.GAME_FINISH || adType == AdType.RESET) {
+      val ad = mInterstitialAd
+      if (ad != null) {
+        mInterstitialAd = null
+        viewModel.onRealAdStarted()
+        runOnUiThread {
+          ad.fullScreenContentCallback = object : FullScreenContentCallback() {
+            override fun onAdDismissedFullScreenContent() {
+              loadInterstitialAd()
+              viewModel.onRealAdCompleted(adType)
+            }
+
+            override fun onAdFailedToShowFullScreenContent(adError: AdError) {
+              mInterstitialAd = null
+              Log.e("AdMob", "Interstitial ad failed to show: ${adError.message}")
+            }
+          }
+          ad.show(this@MainActivity)
+        }
+      }
+    } else if (adType == AdType.GUARANTEED_SIX || adType == AdType.EXTEND_TIME || adType == AdType.WATCH_AD) {
+      val ad = mRewardedAd
+      if (ad != null) {
+        mRewardedAd = null
+        viewModel.onRealAdStarted()
+        runOnUiThread {
+          var rewardEarned = false
+          ad.fullScreenContentCallback = object : FullScreenContentCallback() {
+            override fun onAdDismissedFullScreenContent() {
+              loadRewardedAd()
+              if (rewardEarned) {
+                viewModel.onRealAdCompleted(adType)
+              } else {
+                viewModel.dismissAd()
+              }
+            }
+
+            override fun onAdFailedToShowFullScreenContent(adError: AdError) {
+              mRewardedAd = null
+              Log.e("AdMob", "Rewarded ad failed to show: ${adError.message}")
+            }
+          }
+          ad.show(this@MainActivity) {
+            rewardEarned = true
+          }
+        }
+      }
+    }
   }
 
   private fun loadInterstitialAd() {

@@ -47,45 +47,77 @@ data class BannerAdData(
 
 @Composable
 fun BannerAd(modifier: Modifier = Modifier) {
-    var showBackupAds by remember { mutableStateOf(false) }
+    var adMode by remember { mutableStateOf(0) } // 0: Start.io, 1: AdMob, 2: Backup
 
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .height(68.dp) // Total height increased to accommodate 12dp bottom padding beautifully
+            .height(68.dp)
             .background(Color(0xFF0F172A))
-            .padding(bottom = 12.dp), // Lift the banner ad up slightly as requested by the user ("halkasa uper kardo")
+            .padding(bottom = 12.dp),
         contentAlignment = Alignment.Center
     ) {
-        if (!showBackupAds) {
-            AndroidView(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(50.dp),
-                factory = { context ->
-                    AdView(context).apply {
-                        setAdSize(AdSize.BANNER)
-                        adUnitId = "ca-app-pub-3940256099942544/6300978111" // Google AdMob Test Banner ID
-                        adListener = object : AdListener() {
-                            override fun onAdLoaded() {
-                                Log.d("AdMob", "Banner ad loaded successfully.")
-                            }
+        when (adMode) {
+            0 -> {
+                // Try Start.io Banner Ad
+                AndroidView(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(50.dp),
+                    factory = { context ->
+                        try {
+                            com.startapp.sdk.ads.banner.Banner(context).apply {
+                                setBannerListener(object : com.startapp.sdk.ads.banner.BannerListener {
+                                    override fun onReceiveAd(view: android.view.View?) {
+                                        Log.d("StartIO", "Start.io Banner loaded successfully.")
+                                    }
 
-                            override fun onAdFailedToLoad(error: LoadAdError) {
-                                Log.e("AdMob", "Banner ad failed to load: ${error.code} - ${error.message}. Switching to backup animated ads.")
-                                showBackupAds = true
+                                    override fun onFailedToReceiveAd(view: android.view.View?) {
+                                        Log.e("StartIO", "Start.io Banner failed, switching to AdMob/Backup.")
+                                        adMode = 1
+                                    }
+
+                                    override fun onClick(view: android.view.View?) {}
+                                    override fun onImpression(view: android.view.View?) {}
+                                })
                             }
+                        } catch (e: Exception) {
+                            Log.e("StartIO", "Exception creating Start.io Banner: ${e.message}")
+                            adMode = 1
+                            android.view.View(context)
                         }
-                        loadAd(AdRequest.Builder().build())
                     }
-                },
-                update = { adView ->
-                    // AdView handles updates internally
-                }
-            )
-        } else {
-            // Render the backup simulated rotating ads beautifully
-            BackupSimulatedBannerAd()
+                )
+            }
+            1 -> {
+                // Try AdMob Banner Ad
+                AndroidView(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(50.dp),
+                    factory = { context ->
+                        AdView(context).apply {
+                            setAdSize(AdSize.BANNER)
+                            adUnitId = "ca-app-pub-3940256099942544/6300978111"
+                            adListener = object : AdListener() {
+                                override fun onAdLoaded() {
+                                    Log.d("AdMob", "AdMob Banner loaded successfully.")
+                                }
+
+                                override fun onAdFailedToLoad(error: LoadAdError) {
+                                    Log.e("AdMob", "AdMob Banner failed: ${error.message}. Switching to backup ads.")
+                                    adMode = 2
+                                }
+                            }
+                            loadAd(AdRequest.Builder().build())
+                        }
+                    }
+                )
+            }
+            else -> {
+                // Backup animated interactive banner
+                BackupSimulatedBannerAd()
+            }
         }
     }
 }
