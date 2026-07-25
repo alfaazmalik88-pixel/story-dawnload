@@ -1,0 +1,149 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- 1. Elegant shadow layer for the crown -->
+    <path
+        android:fillColor="#44000000"
+        android:pathData="M 30,70 L 30,52 L 43,60 L 56,34 L 69,60 L 82,52 L 82,70 Z" />
+
+    <!-- 2. Main Golden Crown Body with a rich golden gradient -->
+    <path
+        android:pathData="M 28,68 L 28,50 L 41,58 L 54,32 L 67,58 L 80,50 L 80,68 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:startX="28"
+                android:startY="32"
+                android:endX="80"
+                android:endY="68"
+                android:type="linear">
+                <item android:offset="0.0" android:color="#FFE082" /> <!-- Rich Light Gold -->
+                <item android:offset="0.5" android:color="#F59E0B" /> <!-- Amber Gold -->
+                <item android:offset="1.0" android:color="#D97706" /> <!-- Deep Gold -->
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- 3. Curved Base band of the crown -->
+    <path
+        android:pathData="M 28,64 Q 54,68 80,64 L 80,68 Q 54,72 28,68 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:startX="28"
+                android:startY="64"
+                android:endX="80"
+                android:endY="72"
+                android:type="linear">
+                <item android:offset="0.0" android:color="#D97706" />
+                <item android:offset="0.5" android:color="#F59E0B" />
+                <item android:offset="1.0" android:color="#B45309" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- 4. Jewel tips (Golden Spheres at the top of the spikes) -->
+    <!-- Left Spike Sphere -->
+    <path
+        android:pathData="M 28,50 m -4,0 a 4,4 0,1 1,8 0 a 4,4 0,1 1,-8 0">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:startX="24"
+                android:startY="46"
+                android:endX="32"
+                android:endY="54"
+                android:type="linear">
+                <item android:offset="0.0" android:color="#FFE082" />
+                <item android:offset="1.0" android:color="#D97706" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Right Spike Sphere -->
+    <path
+        android:pathData="M 80,50 m -4,0 a 4,4 0,1 1,8 0 a 4,4 0,1 1,-8 0">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:startX="76"
+                android:startY="46"
+                android:endX="84"
+                android:endY="54"
+                android:type="linear">
+                <item android:offset="0.0" android:color="#FFE082" />
+                <item android:offset="1.0" android:color="#D97706" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Center Spike Sphere -->
+    <path
+        android:pathData="M 54,32 m -5.5,0 a 5.5,5.5 0,1 1,11 0 a 5.5,5.5 0,1 1,-11 0">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:startX="48.5"
+                android:startY="26.5"
+                android:endX="59.5"
+                android:endY="37.5"
+                android:type="linear">
+                <item android:offset="0.0" android:color="#FDE047" /> <!-- Yellow Gold -->
+                <item android:offset="1.0" android:color="#D97706" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- 5. Royal Gemstones in the crown -->
+    <!-- Center Ruby Diamond Gemstone -->
+    <path
+        android:fillColor="#E11D48"
+        android:pathData="M 54,42 L 59,47 L 54,52 L 49,47 Z" />
+    <path
+        android:fillColor="#FDA4AF"
+        android:pathData="M 54,42 L 56.5,47 L 54,49.5 L 51.5,47 Z" />
+
+    <!-- Left Emerald Gemstone -->
+    <path
+        android:fillColor="#10B981"
+        android:pathData="M 35,53 L 38,55 L 35,57 L 32,55 Z" />
+
+    <!-- Right Sapphire Gemstone -->
+    <path
+        android:fillColor="#3B82F6"
+        android:pathData="M 73,53 L 76,55 L 73,57 L 70,55 Z" />
+
+    <!-- 6. Four Shiny Ludo Goti / Pieces below the crown -->
+    <!-- Red Goti -->
+    <path
+        android:fillColor="#EF4444"
+        android:pathData="M 34,79 m -4.5,0 a 4.5,4.5 0,1 1,9 0 a 4.5,4.5 0,1 1,-9 0" />
+    <path
+        android:fillColor="#FEE2E2"
+        android:pathData="M 32.5,77.5 m -1.5,0 a 1.5,1.5 0,1 1,3 0 a 1.5,1.5 0,1 1,-3 0" />
+
+    <!-- Green Goti -->
+    <path
+        android:fillColor="#10B981"
+        android:pathData="M 47,79 m -4.5,0 a 4.5,4.5 0,1 1,9 0 a 4.5,4.5 0,1 1,-9 0" />
+    <path
+        android:fillColor="#D1FAE5"
+        android:pathData="M 45.5,77.5 m -1.5,0 a 1.5,1.5 0,1 1,3 0 a 1.5,1.5 0,1 1,-3 0" />
+
+    <!-- Yellow Goti -->
+    <path
+        android:fillColor="#F59E0B"
+        android:pathData="M 61,79 m -4.5,0 a 4.5,4.5 0,1 1,9 0 a 4.5,4.5 0,1 1,-9 0" />
+    <path
+        android:fillColor="#FEF3C7"
+        android:pathData="M 59.5,77.5 m -1.5,0 a 1.5,1.5 0,1 1,3 0 a 1.5,1.5 0,1 1,-3 0" />
+
+    <!-- Blue Goti -->
+    <path
+        android:fillColor="#3B82F6"
+        android:pathData="M 74,79 m -4.5,0 a 4.5,4.5 0,1 1,9 0 a 4.5,4.5 0,1 1,-9 0" />
+    <path
+        android:fillColor="#DBEAFE"
+        android:pathData="M 72.5,77.5 m -1.5,0 a 1.5,1.5 0,1 1,3 0 a 1.5,1.5 0,1 1,-3 0" />
+
+</vector>
