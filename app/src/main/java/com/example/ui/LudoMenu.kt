@@ -77,6 +77,7 @@ fun LudoMenu(
     var showLanguageDialog by remember { mutableStateOf(false) }
     var showSettingsDialog by remember { mutableStateOf(false) }
     var showNoInternetDialog by remember { mutableStateOf(false) }
+    var noInternetNoticeMode by remember { mutableStateOf<LudoGameMode?>(null) }
     var showRenameDialog by remember { mutableStateOf(false) }
     var showShopDialog by remember { mutableStateOf(false) }
     var newNameInput by remember { mutableStateOf("") }
@@ -1259,6 +1260,7 @@ fun LudoMenu(
                                 if (isInternetAvailable(context)) {
                                     viewModel.selectGameMode(LudoGameMode.HYBRID_ONLINE)
                                 } else {
+                                    noInternetNoticeMode = LudoGameMode.HYBRID_ONLINE
                                     showNoInternetDialog = true
                                 }
                             },
@@ -1561,7 +1563,13 @@ fun LudoMenu(
                     // PLAY button (Green, pill-shaped, glowing)
                     Button(
                         onClick = {
-                            viewModel.startGame()
+                            val currentMode = uiState.gameMode
+                            if (currentMode == LudoGameMode.HYBRID_ONLINE && !isInternetAvailable(context)) {
+                                noInternetNoticeMode = currentMode
+                                showNoInternetDialog = true
+                            } else {
+                                viewModel.startGame()
+                            }
                         },
                         modifier = Modifier
                             .weight(1f)
@@ -1744,6 +1752,7 @@ fun LudoMenu(
         }
 
         if (showNoInternetDialog) {
+            val descKey = "internet_required_desc_online"
             AlertDialog(
                 onDismissRequest = { showNoInternetDialog = false },
                 title = {
@@ -1761,7 +1770,7 @@ fun LudoMenu(
                 },
                 text = {
                     Text(
-                        text = LudoTranslations.getTranslation("internet_required_desc", uiState.selectedLanguage),
+                        text = LudoTranslations.getTranslation(descKey, uiState.selectedLanguage),
                         color = Color(0xFFE2E8F0),
                         fontSize = 14.sp
                     )

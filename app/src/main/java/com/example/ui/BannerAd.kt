@@ -20,11 +20,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
-import com.google.android.gms.ads.AdListener
-import com.google.android.gms.ads.AdRequest
-import com.google.android.gms.ads.AdSize
-import com.google.android.gms.ads.AdView
-import com.google.android.gms.ads.LoadAdError
 import kotlinx.coroutines.delay
 
 interface AdItem {
@@ -47,7 +42,7 @@ data class BannerAdData(
 
 @Composable
 fun BannerAd(modifier: Modifier = Modifier) {
-    var adMode by remember { mutableStateOf(0) } // 0: Start.io, 1: AdMob, 2: Backup
+    var adMode by remember { mutableStateOf(0) } // 0: Start.io, 1: Backup
 
     Box(
         modifier = modifier
@@ -59,7 +54,7 @@ fun BannerAd(modifier: Modifier = Modifier) {
     ) {
         when (adMode) {
             0 -> {
-                // Try Start.io Banner Ad
+                // Start.io Banner Ad
                 AndroidView(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -73,7 +68,7 @@ fun BannerAd(modifier: Modifier = Modifier) {
                                     }
 
                                     override fun onFailedToReceiveAd(view: android.view.View?) {
-                                        Log.e("StartIO", "Start.io Banner failed, switching to AdMob/Backup.")
+                                        Log.e("StartIO", "Start.io Banner failed, switching to backup.")
                                         adMode = 1
                                     }
 
@@ -85,31 +80,6 @@ fun BannerAd(modifier: Modifier = Modifier) {
                             Log.e("StartIO", "Exception creating Start.io Banner: ${e.message}")
                             adMode = 1
                             android.view.View(context)
-                        }
-                    }
-                )
-            }
-            1 -> {
-                // Try AdMob Banner Ad
-                AndroidView(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(50.dp),
-                    factory = { context ->
-                        AdView(context).apply {
-                            setAdSize(AdSize.BANNER)
-                            adUnitId = "ca-app-pub-3940256099942544/6300978111"
-                            adListener = object : AdListener() {
-                                override fun onAdLoaded() {
-                                    Log.d("AdMob", "AdMob Banner loaded successfully.")
-                                }
-
-                                override fun onAdFailedToLoad(error: LoadAdError) {
-                                    Log.e("AdMob", "AdMob Banner failed: ${error.message}. Switching to backup ads.")
-                                    adMode = 2
-                                }
-                            }
-                            loadAd(AdRequest.Builder().build())
                         }
                     }
                 )

@@ -255,7 +255,9 @@ object LudoTranslations {
                     "not_enough_coins" -> "⚠️ आपके पास पर्याप्त सिक्के नहीं हैं! खेलने के लिए आपको %d 🪙 की आवश्यकता है।"
                     "select_mode_msg" -> "खेलने के लिए लूडो गेम मोड चुनें!"
                     "internet_required_title" -> "⚠️ आपका इंटरनेट बंद है!"
-                    "internet_required_desc" -> "⚠️ आपका इंटरनेट बंद है! 1v1 मैच खेलने के लिए कृपया अपना इंटरनेट (Net) ऑन करें और दोबारा प्रयास करें।"
+                    "internet_required_desc" -> "⚠️ आपका इंटरनेट बंद है! 1v1 या ऑनलाइन मैच खेलने के लिए कृपया अपना इंटरनेट (Net) ऑन करें और प्रयास करें।"
+                    "internet_required_desc_1v1" -> "⚠️ आपका इंटरनेट बंद है! 1v1 (1 बनाम 1) गेम खेलने के लिए कृपया अपना इंटरनेट (Net) ऑन करें और गेम शुरू करें।"
+                    "internet_required_desc_online" -> "⚠️ आपका इंटरनेट बंद है! ऑनलाइन गेम (Online Match) खेलने के लिए कृपया अपना इंटरनेट (Net) ऑन करें और गेम शुरू करें।"
                     "reset_confirm_title" -> "क्या आप गेम रीसेट करना चाहते हैं?"
                     "reset_confirm_desc" -> "इससे आपका चालू मैच रीस्टार्ट हो जाएगा और सारी गोटियाँ वापस घर में चली जाएँगी। क्या आप वाकई रीसेट करना चाहते हैं?"
                     "yes" -> "हाँ"
@@ -1417,6 +1419,15 @@ class LudoViewModel : ViewModel() {
         val lang = uiState.value.selectedLanguage
         val isWagerMode = mode == LudoGameMode.ONE_VS_ONE || mode == LudoGameMode.HYBRID_ONLINE
         val wager = uiState.value.selectedWagerAmount
+
+        if (mode == LudoGameMode.HYBRID_ONLINE) {
+            if (!isInternetAvailable()) {
+                val netMsg = LudoTranslations.getTranslation("internet_required_desc_online", lang)
+                _uiState.update { it.copy(statusMessage = "❌ $netMsg") }
+                return
+            }
+        }
+
         if (isWagerMode) {
             if (uiState.value.coins < wager) {
                 val msg = LudoTranslations.getTranslation("not_enough_coins", lang)
@@ -1693,9 +1704,9 @@ class LudoViewModel : ViewModel() {
 
         val matchesRef = try { firebaseDb?.getReference("matches") } catch (e: Exception) { null }
 
-        // Fast timeout safeguard: if real Firebase database doesn't connect/respond in 1.8 seconds, complete lobby matchmaking seamlessly!
+        // Timeout safeguard: if real Firebase database doesn't connect/respond within 8 seconds, complete lobby matchmaking smoothly!
         val timeoutJob = viewModelScope.launch {
-            delay(1800)
+            delay(if (matchesRef != null) 8000L else 1500L)
             if (_uiState.value.isFindingOpponent && _uiState.value.gamePhase != GamePhase.PLAYING) {
                 _uiState.update { it.copy(statusMessage = "🤝 Opponents found! Syncing online game state... 🚀") }
                 delay(400)
@@ -2788,25 +2799,37 @@ class LudoViewModel : ViewModel() {
     }
 
     fun triggerAd(type: AdType) {
+        val isRewarded = (type == AdType.GUARANTEED_SIX || type == AdType.EXTEND_TIME || type == AdType.WATCH_AD)
         if (!isInternetAvailable()) {
-            val language = uiState.value.selectedLanguage
-            val title = LudoTranslations.getTranslation("internet_required_title", language)
-            _uiState.update { it.copy(statusMessage = "❌ $title") }
-            return
+            if (isRewarded) {
+                _uiState.update { 
+                    it.copy(
+                        adType = null,
+                        isRealAdShowing = false,
+                        statusMessage = "❌ Internet Connection Required! Offline users cannot earn ad rewards."
+                    ) 
+                }
+                return
+            } else {
+                // Non-rewarded ad transition (e.g. GAME_FINISH, RESET): proceed cleanly without showing ad
+                onRealAdCompleted(type)
+                return
+            }
         }
-        // Prepare countdown for backup simulated ad player
+
+        // Set adType to trigger Start.io ad display in MainActivity
         _uiState.update { it.copy(adType = type, adSecondsLeft = 5, isRealAdShowing = false) }
+
+        // Keep fallback countdown if Start.io SDK fails to load or fill in time
         viewModelScope.launch {
             var seconds = 5
             while (seconds > 0) {
                 delay(1000)
-                // If the state was cleared or a real ad is showing, stop countdown
                 val currentState = _uiState.value
                 if (currentState.adType != type || currentState.isRealAdShowing) return@launch
                 seconds--
                 _uiState.update { it.copy(adSecondsLeft = seconds) }
             }
-            // Ad completed successfully via simulated fallback!
             val currentState = _uiState.value
             if (currentState.adType == type && !currentState.isRealAdShowing) {
                 onRealAdCompleted(type)
@@ -2816,6 +2839,16 @@ class LudoViewModel : ViewModel() {
 
     fun onRealAdStarted() {
         _uiState.update { it.copy(isRealAdShowing = true) }
+    }
+
+    fun onAdFailedOrOffline(message: String) {
+        _uiState.update { 
+            it.copy(
+                adType = null,
+                isRealAdShowing = false,
+                statusMessage = message
+            ) 
+        }
     }
 
     fun onRealAdCompleted(type: AdType) {
@@ -3001,6 +3034,10 @@ class LudoViewModel : ViewModel() {
         val userPlayer = state.players.firstOrNull { it.type == PlayerType.HUMAN } ?: return
         
         addChatMessage(userPlayer.name, userPlayer.color, message)
+
+        if (activeFirebaseMatchId != null) {
+            syncLocalStateToFirebase("CHAT", "💬 ${userPlayer.name}: $message")
+        }
 
         // Show the user's message as a bubble over the user's avatar
         _uiState.update { currentState ->

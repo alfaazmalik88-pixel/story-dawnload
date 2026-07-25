@@ -144,50 +144,52 @@ fun LudoBoard(
                     }
                 },
                 actions = {
-                    // Chat Button
-                    IconButton(onClick = { showChatDialog = true }) {
-                        Icon(
-                            imageVector = Icons.Default.Chat,
-                            contentDescription = "Quick Chat",
-                            tint = Color(0xFFFFD700)
-                        )
-                    }
-
-                    // Speaker/Voice Chat Button
-                    IconButton(onClick = { viewModel.toggleVoice() }) {
-                        Icon(
-                            imageVector = if (state.isVoiceEnabled) Icons.Default.Hearing else Icons.Default.VolumeOff,
-                            contentDescription = "Toggle Voice Speaker",
-                            tint = if (state.isVoiceEnabled) Color(0xFF10B981) else Color.LightGray
-                        )
-                    }
-
-                    // Microphone/Mic Button with live amplitude glow
-                    IconButton(onClick = {
-                        if (state.isMicEnabled) {
-                            viewModel.disableMic()
-                        } else {
-                            if (androidx.core.content.ContextCompat.checkSelfPermission(context, android.Manifest.permission.RECORD_AUDIO) == android.content.pm.PackageManager.PERMISSION_GRANTED) {
-                                viewModel.enableMic(context)
-                            } else {
-                                micPermissionLauncher.launch(android.Manifest.permission.RECORD_AUDIO)
-                            }
-                        }
-                    }) {
-                        Box(contentAlignment = Alignment.Center) {
-                            if (state.isMicEnabled) {
-                                val glowAlpha = (state.micAmplitude * 0.8f + 0.3f).coerceIn(0.3f, 1f)
-                                Surface(
-                                    modifier = Modifier.size(32.dp),
-                                    shape = CircleShape,
-                                    color = Color(0xFF10B981).copy(alpha = glowAlpha)
-                                ) {}
-                            }
+                    if (state.gameMode == LudoGameMode.HYBRID_ONLINE) {
+                        // Quick Chat Button (Online Only)
+                        IconButton(onClick = { showChatDialog = true }) {
                             Icon(
-                                imageVector = if (state.isMicEnabled) Icons.Default.Mic else Icons.Default.MicOff,
-                                contentDescription = "Toggle Microphone",
-                                tint = if (state.isMicEnabled) Color.White else Color.LightGray
+                                imageVector = Icons.Default.Chat,
+                                contentDescription = "Quick Chat",
+                                tint = Color(0xFFFFD700)
                             )
+                        }
+
+                        // Speaker/Voice Chat Button (Online Only)
+                        IconButton(onClick = { viewModel.toggleVoice() }) {
+                            Icon(
+                                imageVector = if (state.isVoiceEnabled) Icons.Default.Hearing else Icons.Default.VolumeOff,
+                                contentDescription = "Toggle Voice Speaker",
+                                tint = if (state.isVoiceEnabled) Color(0xFF10B981) else Color.LightGray
+                            )
+                        }
+
+                        // Microphone/Mic Button with live amplitude glow (Online Only)
+                        IconButton(onClick = {
+                            if (state.isMicEnabled) {
+                                viewModel.disableMic()
+                            } else {
+                                if (androidx.core.content.ContextCompat.checkSelfPermission(context, android.Manifest.permission.RECORD_AUDIO) == android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                                    viewModel.enableMic(context)
+                                } else {
+                                    micPermissionLauncher.launch(android.Manifest.permission.RECORD_AUDIO)
+                                }
+                            }
+                        }) {
+                            Box(contentAlignment = Alignment.Center) {
+                                if (state.isMicEnabled) {
+                                    val glowAlpha = (state.micAmplitude * 0.8f + 0.3f).coerceIn(0.3f, 1f)
+                                    Surface(
+                                        modifier = Modifier.size(32.dp),
+                                        shape = CircleShape,
+                                        color = Color(0xFF10B981).copy(alpha = glowAlpha)
+                                    ) {}
+                                }
+                                Icon(
+                                    imageVector = if (state.isMicEnabled) Icons.Default.Mic else Icons.Default.MicOff,
+                                    contentDescription = "Toggle Microphone",
+                                    tint = if (state.isMicEnabled) Color.White else Color.LightGray
+                                )
+                            }
                         }
                     }
 
@@ -789,7 +791,7 @@ fun LudoBoard(
                                     )
                                 } else {
                                     DiceSixIcon(
-                                        size = 12.dp,
+                                        size = 15.dp,
                                         isEnabled = isEligibleForSix || state.nextRollIsSix,
                                         isNextRollSix = state.nextRollIsSix
                                     )
@@ -1496,63 +1498,59 @@ fun LudoBoard(
 @Composable
 fun DiceSixIcon(
     modifier: Modifier = Modifier,
-    size: androidx.compose.ui.unit.Dp = 20.dp,
+    size: androidx.compose.ui.unit.Dp = 15.dp,
     isEnabled: Boolean = true,
     isNextRollSix: Boolean = false
 ) {
-    val dotSize = (size.value * 0.13f).dp
-    val paddingSize = (size.value * 0.16f).dp
-    val cornerRadius = (size.value * 0.22f).dp
-    Box(
+    val bgColors = if (isNextRollSix) {
+        listOf(Color(0xFF10B981), Color(0xFF047857))
+    } else if (isEnabled) {
+        listOf(Color(0xFFEF4444), Color(0xFFB91C1C))
+    } else {
+        listOf(Color(0xFF475569), Color(0xFF334155))
+    }
+    val borderColor = if (isNextRollSix) Color(0xFFA7F3D0) else if (isEnabled) Color(0xFFFFD700) else Color(0xFF64748B)
+
+    Canvas(
         modifier = modifier
             .size(size)
-            .shadow(if (isEnabled) 3.dp else 0.dp, RoundedCornerShape(cornerRadius))
-            .background(
-                brush = Brush.verticalGradient(
-                    colors = if (isNextRollSix) {
-                        listOf(Color(0xFF10B981), Color(0xFF047857))
-                    } else if (isEnabled) {
-                        listOf(Color(0xFFEF4444), Color(0xFFB91C1C))
-                    } else {
-                        listOf(Color(0xFF475569), Color(0xFF334155))
-                    }
-                ),
-                shape = RoundedCornerShape(cornerRadius)
-            )
-            .border(
-                width = 1.dp,
-                color = if (isNextRollSix) Color(0xFFA7F3D0) else if (isEnabled) Color(0xFFFFD700) else Color(0xFF64748B),
-                shape = RoundedCornerShape(cornerRadius)
-            )
-            .padding(paddingSize),
-        contentAlignment = Alignment.Center
+            .shadow(if (isEnabled) 2.dp else 0.dp, RoundedCornerShape(3.dp))
     ) {
-        Column(
-            verticalArrangement = Arrangement.SpaceBetween,
-            modifier = Modifier.fillMaxSize()
-        ) {
-            Row(
-                horizontalArrangement = Arrangement.SpaceBetween,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Box(modifier = Modifier.size(dotSize).background(Color.White, androidx.compose.foundation.shape.CircleShape))
-                Box(modifier = Modifier.size(dotSize).background(Color.White, androidx.compose.foundation.shape.CircleShape))
-            }
-            Row(
-                horizontalArrangement = Arrangement.SpaceBetween,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Box(modifier = Modifier.size(dotSize).background(Color.White, androidx.compose.foundation.shape.CircleShape))
-                Box(modifier = Modifier.size(dotSize).background(Color.White, androidx.compose.foundation.shape.CircleShape))
-            }
-            Row(
-                horizontalArrangement = Arrangement.SpaceBetween,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Box(modifier = Modifier.size(dotSize).background(Color.White, androidx.compose.foundation.shape.CircleShape))
-                Box(modifier = Modifier.size(dotSize).background(Color.White, androidx.compose.foundation.shape.CircleShape))
-            }
-        }
+        val w = this.size.width
+        val h = this.size.height
+        val cornerRadius = w * 0.22f
+        val corner = androidx.compose.ui.geometry.CornerRadius(cornerRadius, cornerRadius)
+
+        // 1. Draw Die Face Background
+        drawRoundRect(
+            brush = Brush.verticalGradient(bgColors),
+            cornerRadius = corner
+        )
+
+        // 2. Draw Die Border
+        drawRoundRect(
+            color = borderColor,
+            cornerRadius = corner,
+            style = androidx.compose.ui.graphics.drawscope.Stroke(width = 1.dp.toPx())
+        )
+
+        // 3. Draw 6 Crisp Center White Dots
+        val dotRadius = w * 0.09f
+        val xLeft = w * 0.30f
+        val xRight = w * 0.70f
+        val yTop = h * 0.24f
+        val yMid = h * 0.50f
+        val yBot = h * 0.76f
+
+        // Top pair
+        drawCircle(Color.White, radius = dotRadius, center = Offset(xLeft, yTop))
+        drawCircle(Color.White, radius = dotRadius, center = Offset(xRight, yTop))
+        // Middle pair
+        drawCircle(Color.White, radius = dotRadius, center = Offset(xLeft, yMid))
+        drawCircle(Color.White, radius = dotRadius, center = Offset(xRight, yMid))
+        // Bottom pair
+        drawCircle(Color.White, radius = dotRadius, center = Offset(xLeft, yBot))
+        drawCircle(Color.White, radius = dotRadius, center = Offset(xRight, yBot))
     }
 }
 

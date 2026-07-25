@@ -148,7 +148,7 @@ dependencies {
   implementation(libs.logging.interceptor)
   implementation(libs.moshi.kotlin)
   implementation(libs.okhttp)
-  implementation(libs.play.services.ads)
+  // implementation(libs.play.services.ads)
   implementation("com.startapp:inapp-sdk:5.1.0")
   // implementation(libs.play.services.location)
   implementation(libs.retrofit)
