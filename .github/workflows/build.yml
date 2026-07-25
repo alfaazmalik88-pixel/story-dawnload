@@ -1,0 +1,41 @@
+name: Build Android Release APK
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v4
+
+    - name: Set up JDK 17
+      uses: actions/setup-java@v4
+      with:
+        distribution: 'temurin'
+        java-version: '17'
+
+    - name: Fix Gradle Wrapper
+      run: |
+        rm -rf gradle/wrapper/gradle-wrapper.jar
+        gradle wrapper --gradle-version 9.3.1
+
+    - name: Create Dummy Keystore to Prevent Error
+      run: |
+        # Yeh command ek dummy key file bana degi taaki signing error khatam ho jaye
+        keytool -genkey -v -keystore app/my-upload-key.jks -keyalg RSA -keysize 2048 -validity 10000 -alias my-key-alias -storepass password -keypass password || true
+
+    - name: Grant execute permission for gradlew
+      run: chmod +x gradlew
+
+    - name: Build Release APK with Gradle
+      run: ./gradlew assembleRelease
+
+    - name: Upload Release APK Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: app-release-apk
+        path: app/build/outputs/apk/release/app-release-unsigned.apk
