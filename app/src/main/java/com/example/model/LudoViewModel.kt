@@ -676,7 +676,7 @@ data class LudoState(
     val winsComputer: Int = 0,
     val winsOneVsOne: Int = 0,
     val winsOnline: Int = 0,
-    val gameplaySpeed: String = "NORMAL",
+    val gameplaySpeed: String = "SLOW",
     val bio: String = "Ludo Champion! 🎲",
     val selectedAvatarId: Int = 0,
     val liveOnlineUsersCount: Int = 1
@@ -818,7 +818,7 @@ class LudoViewModel : ViewModel() {
         val winsComputer = prefs.getInt("wins_computer", 0)
         val winsOneVsOne = prefs.getInt("wins_one_vs_one", 0)
         val winsOnline = prefs.getInt("wins_online", 0)
-        val gameplaySpeed = prefs.getString("gameplay_speed", "NORMAL") ?: "NORMAL"
+        val gameplaySpeed = prefs.getString("gameplay_speed", "SLOW") ?: "SLOW"
         val bio = prefs.getString("bio", "Ludo Champion! 🎲") ?: "Ludo Champion! 🎲"
         val selectedAvatarId = prefs.getInt("selected_avatar_id", 0)
 
@@ -886,10 +886,10 @@ class LudoViewModel : ViewModel() {
                 val projectId = try { com.example.BuildConfig.FIREBASE_PROJECT_ID } catch (e: Exception) { "" }
                 val appId = try { com.example.BuildConfig.FIREBASE_APPLICATION_ID } catch (e: Exception) { "" }
 
-                val finalDbUrl = if (dbUrl.isNotBlank() && !dbUrl.contains("your_firebase_database_url")) dbUrl else "https://ludo-star-realtime-default-rtdb.firebaseio.com"
-                val finalApiKey = if (apiKey.isNotBlank() && !apiKey.contains("your_firebase_api_key")) apiKey else "AIzaSyA_DefaultLudoPublicApiKey123456"
-                val finalProjectId = if (projectId.isNotBlank() && !projectId.contains("your_firebase_project_id")) projectId else "ludo-star-realtime"
-                val finalAppId = if (appId.isNotBlank() && !appId.contains("your_firebase_application_id")) appId else "1:1077812810754:android:defaultludo"
+                val finalDbUrl = if (dbUrl.isNotBlank() && !dbUrl.contains("your_firebase_database_url")) dbUrl else "https://crown-ludo-2-default-rtdb.firebaseio.com"
+                val finalApiKey = if (apiKey.isNotBlank() && !apiKey.contains("your_firebase_api_key")) apiKey else "AIzaSyCt34364nKPbtn4dtpx6QcQrMpipknBHZw"
+                val finalProjectId = if (projectId.isNotBlank() && !projectId.contains("your_firebase_project_id")) projectId else "crown-ludo-2"
+                val finalAppId = if (appId.isNotBlank() && !appId.contains("your_firebase_application_id")) appId else "1:1050963446182:android:d8c003b84d920238442767"
 
                 val options = com.google.firebase.FirebaseOptions.Builder()
                     .setDatabaseUrl(finalDbUrl)
@@ -906,7 +906,12 @@ class LudoViewModel : ViewModel() {
 
             if (app != null) {
                 val dbUrl = try { com.example.BuildConfig.FIREBASE_DATABASE_URL } catch (e: Exception) { "" }
-                val finalDbUrl = if (dbUrl.isNotBlank() && !dbUrl.contains("your_firebase_database_url")) dbUrl else "https://ludo-star-realtime-default-rtdb.firebaseio.com"
+                val appDbUrl = try { app.options.databaseUrl } catch (e: Exception) { null }
+                val finalDbUrl = when {
+                    !appDbUrl.isNullOrBlank() -> appDbUrl
+                    dbUrl.isNotBlank() && !dbUrl.contains("your_firebase_database_url") -> dbUrl
+                    else -> "https://crown-ludo-2-default-rtdb.firebaseio.com"
+                }
                 
                 firebaseDb = try {
                     FirebaseDatabase.getInstance(finalDbUrl)
@@ -1288,15 +1293,15 @@ class LudoViewModel : ViewModel() {
 
     fun setGameplaySpeed(speed: String) {
         _uiState.update { it.copy(gameplaySpeed = speed) }
-        sharedPrefs?.edit()?.putString("gameplay_speed", speed)?.apply()
+        sharedPrefs?.edit()?.putString("gameplay_speed", speed)?.commit()
     }
 
     fun getGameplaySpeedMultiplier(): Double {
         return when (_uiState.value.gameplaySpeed) {
-            "SLOW" -> 1.2
-            "FAST" -> 0.3
-            "TURBO" -> 0.12
-            else -> 0.6 // Make NORMAL much faster and more responsive as well!
+            "SLOW" -> 1.6
+            "FAST" -> 0.35
+            "TURBO" -> 0.15
+            else -> 0.7
         }
     }
 
@@ -2247,7 +2252,13 @@ class LudoViewModel : ViewModel() {
                 isDailyRewardAvailable = currentState.isDailyRewardAvailable,
                 lastCheckInTime = currentState.lastCheckInTime,
                 friendsList = currentState.friendsList,
-                addedFriends = emptySet()
+                addedFriends = emptySet(),
+                winsComputer = currentState.winsComputer,
+                winsOneVsOne = currentState.winsOneVsOne,
+                winsOnline = currentState.winsOnline,
+                gameplaySpeed = currentState.gameplaySpeed,
+                bio = currentState.bio,
+                selectedAvatarId = currentState.selectedAvatarId
             )
         }
         sharedPrefs?.edit()?.putInt("coins", _uiState.value.coins)?.commit()
