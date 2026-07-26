@@ -61,25 +61,20 @@ android {
 
   signingConfigs {
     create("release") {
-      val keystorePath = System.getenv("KEYSTORE_PATH") ?: "${rootDir}/my-upload-key.jks"
-      val ksFile = file(keystorePath)
-      if (ksFile.exists()) {
-        storeFile = ksFile
+      val keystorePath = System.getenv("KEYSTORE_PATH")
+      val customKs = if (!keystorePath.isNullOrEmpty()) file(keystorePath) else null
+      val rootDebugKs = file("${rootDir}/debug.keystore")
+      if (customKs != null && customKs.exists()) {
+        storeFile = customKs
         storePassword = System.getenv("STORE_PASSWORD") ?: "android"
         keyAlias = System.getenv("KEY_ALIAS") ?: "upload"
         keyPassword = System.getenv("KEY_PASSWORD") ?: "android"
-      } else {
-        storeFile = file("${rootDir}/debug.keystore")
+      } else if (rootDebugKs.exists()) {
+        storeFile = rootDebugKs
         storePassword = "android"
         keyAlias = "androiddebugkey"
         keyPassword = "android"
       }
-    }
-    create("debugConfig") {
-      storeFile = file("${rootDir}/debug.keystore")
-      storePassword = "android"
-      keyAlias = "androiddebugkey"
-      keyPassword = "android"
     }
   }
 
@@ -88,10 +83,19 @@ android {
       isCrunchPngs = false
       isMinifyEnabled = false
       proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-      signingConfig = signingConfigs.getByName("release")
+      
+      val keystorePath = System.getenv("KEYSTORE_PATH")
+      val customKs = if (!keystorePath.isNullOrEmpty()) file(keystorePath) else null
+      val rootDebugKs = file("${rootDir}/debug.keystore")
+      
+      if ((customKs != null && customKs.exists()) || rootDebugKs.exists()) {
+        signingConfig = signingConfigs.getByName("release")
+      } else {
+        signingConfig = signingConfigs.getByName("debug")
+      }
     }
     debug {
-      signingConfig = signingConfigs.getByName("debugConfig")
+      signingConfig = signingConfigs.getByName("debug")
     }
   }
   compileOptions {
