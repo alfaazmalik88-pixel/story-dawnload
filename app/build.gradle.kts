@@ -25,6 +25,29 @@ fun getSanitizedEnvSecret(rootDir: File, key: String): String {
     .trim()
 }
 
+fun ensureReleaseKeystoreExists(rootDir: File): File {
+  val releaseKs = File(rootDir, "release-key.jks")
+  if (!releaseKs.exists()) {
+    try {
+      val process = ProcessBuilder(
+        "keytool", "-genkey", "-v",
+        "-keystore", releaseKs.absolutePath,
+        "-alias", "releasekey",
+        "-keyalg", "RSA",
+        "-keysize", "2048",
+        "-validity", "10000",
+        "-storepass", "androidrelease",
+        "-keypass", "androidrelease",
+        "-dname", "CN=LudoRelease, OU=Mobile, O=AIStudio, L=City, ST=State, C=US"
+      ).start()
+      process.waitFor()
+    } catch (e: Exception) {
+      e.printStackTrace()
+    }
+  }
+  return releaseKs
+}
+
 plugins {
   alias(libs.plugins.android.application)
   alias(libs.plugins.kotlin.compose)
@@ -63,24 +86,18 @@ android {
     create("release") {
       val keystorePath = System.getenv("KEYSTORE_PATH")
       val customKs = if (!keystorePath.isNullOrEmpty()) file(keystorePath) else null
-      val rootReleaseKs = file("${rootDir}/release-key.jks")
-      val rootDebugKs = file("${rootDir}/debug.keystore")
+      val autoReleaseKs = ensureReleaseKeystoreExists(project.rootDir)
 
       if (customKs != null && customKs.exists()) {
         storeFile = customKs
         storePassword = System.getenv("STORE_PASSWORD") ?: "android"
         keyAlias = System.getenv("KEY_ALIAS") ?: "upload"
         keyPassword = System.getenv("KEY_PASSWORD") ?: "android"
-      } else if (rootReleaseKs.exists()) {
-        storeFile = rootReleaseKs
+      } else {
+        storeFile = autoReleaseKs
         storePassword = "androidrelease"
         keyAlias = "releasekey"
         keyPassword = "androidrelease"
-      } else if (rootDebugKs.exists()) {
-        storeFile = rootDebugKs
-        storePassword = "android"
-        keyAlias = "androiddebugkey"
-        keyPassword = "android"
       }
     }
   }
@@ -90,17 +107,7 @@ android {
       isCrunchPngs = false
       isMinifyEnabled = false
       proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-      
-      val keystorePath = System.getenv("KEYSTORE_PATH")
-      val customKs = if (!keystorePath.isNullOrEmpty()) file(keystorePath) else null
-      val rootReleaseKs = file("${rootDir}/release-key.jks")
-      val rootDebugKs = file("${rootDir}/debug.keystore")
-      
-      if ((customKs != null && customKs.exists()) || rootReleaseKs.exists() || rootDebugKs.exists()) {
-        signingConfig = signingConfigs.getByName("release")
-      } else {
-        signingConfig = signingConfigs.getByName("debug")
-      }
+      signingConfig = signingConfigs.getByName("release")
     }
     debug {
       signingConfig = signingConfigs.getByName("debug")
