@@ -1,3 +1,4 @@
+
 name: Build Debug & Release APK
 
 on:
@@ -21,13 +22,13 @@ jobs:
         cache: gradle
 
     - name: Fix Gradle Wrapper
-      run: gradle wrapper --gradle-version 8.5
+      run: gradle wrapper --gradle-version 8.4
 
     - name: Grant execute permission for gradlew
       run: chmod +x gradlew
 
     - name: Build Debug and Release APK
-      run: ./gradlew assembleDebug assembleRelease --stacktrace
+      run: ./gradlew assembleDebug assembleRelease -Dorg.gradle.project.android.injected.version.check=false
 
     - name: Upload Debug APK
       uses: actions/upload-artifact@v4
