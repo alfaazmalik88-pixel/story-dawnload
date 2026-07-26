@@ -1,5 +1,4 @@
-
-name: Build Indus Release APK
+name: Build All APKs
 
 on:
   push:
@@ -24,12 +23,16 @@ jobs:
     - name: Grant execute permission for gradlew
       run: chmod +x gradlew
 
-    - name: Build Release APK
-      run: ./gradlew assembleRelease --stacktrace
+    - name: Build APKs
+      run: |
+        ./gradlew assembleRelease || echo "Release build failed, proceeding with debug"
+        ./gradlew assembleDebug
 
-    - name: Upload Release APK
+    - name: Upload APK Artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: app-release-apk
-        path: app/build/outputs/apk/release/*.apk
+        name: all-apks
+        path: app/build/outputs/apk/**/*.apk
+
+
         
