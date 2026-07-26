@@ -154,57 +154,44 @@ class MainActivity : ComponentActivity() {
     return false
   }
 
+  private var cachedInterstitialAd: StartAppAd? = null
+  private var cachedRewardedAd: StartAppAd? = null
+
   private fun preloadStartIoAds() {
     if (!isNetworkConnected()) return
-    Log.d("StartIO", "Preloading batch of 4-5 Start.io ads...")
-    for (i in 1..5) {
-      val ad = StartAppAd(this@MainActivity)
-      val mode = if (i % 2 == 0) StartAppAd.AdMode.REWARDED_VIDEO else StartAppAd.AdMode.AUTOMATIC
-      ad.loadAd(mode, object : AdEventListener {
+    Log.d("StartIO", "Preloading Start.io Interstitial and Rewarded Ads...")
+    
+    // Preload Interstitial
+    if (cachedInterstitialAd == null || cachedInterstitialAd?.isReady == false) {
+      val interstitial = StartAppAd(this@MainActivity)
+      interstitial.loadAd(StartAppAd.AdMode.AUTOMATIC, object : AdEventListener {
         override fun onReceiveAd(a: Ad) {
-          Log.d("StartIO", "Preloaded ad #$i successfully")
-          synchronized(cachedStartIoAds) {
-            cachedStartIoAds.add(ad)
-          }
+          Log.d("StartIO", "Preloaded Interstitial Ad successfully")
+          cachedInterstitialAd = interstitial
         }
-        override fun onFailedToReceiveAd(a: Ad?) {}
+        override fun onFailedToReceiveAd(a: Ad?) {
+          Log.w("StartIO", "Failed to preload Interstitial Ad: ${a?.errorMessage}")
+        }
+      })
+    }
+
+    // Preload Rewarded Video
+    if (cachedRewardedAd == null || cachedRewardedAd?.isReady == false) {
+      val rewarded = StartAppAd(this@MainActivity)
+      rewarded.loadAd(StartAppAd.AdMode.REWARDED_VIDEO, object : AdEventListener {
+        override fun onReceiveAd(a: Ad) {
+          Log.d("StartIO", "Preloaded Rewarded Video Ad successfully")
+          cachedRewardedAd = rewarded
+        }
+        override fun onFailedToReceiveAd(a: Ad?) {
+          Log.w("StartIO", "Failed to preload Rewarded Video Ad: ${a?.errorMessage}")
+        }
       })
     }
   }
 
   private fun showStartIoAd(adType: AdType) {
     val isRewarded = (adType == AdType.GUARANTEED_SIX || adType == AdType.EXTEND_TIME || adType == AdType.WATCH_AD)
-    
-    // Check if we have a pre-cached ad ready
-    var readyCachedAd: StartAppAd? = null
-    synchronized(cachedStartIoAds) {
-      val iterator = cachedStartIoAds.iterator()
-      while (iterator.hasNext()) {
-        val candidate = iterator.next()
-        if (candidate.isReady) {
-          readyCachedAd = candidate
-          iterator.remove()
-          break
-        }
-      }
-    }
-
-    if (readyCachedAd != null) {
-      Log.d("StartIO", "Serving preloaded Start.io ad from fast cache!")
-      viewModel.onRealAdStarted()
-      readyCachedAd?.showAd(object : AdDisplayListener {
-        override fun adDisplayed(ad: Ad) {}
-        override fun adHidden(ad: Ad) {
-          viewModel.onRealAdCompleted(adType)
-          preloadStartIoAds() // Replenish cache immediately!
-        }
-        override fun adClicked(ad: Ad) {}
-        override fun adNotDisplayed(ad: Ad) {
-          viewModel.onRealAdCompleted(adType)
-        }
-      })
-      return
-    }
 
     if (!isNetworkConnected()) {
       if (isRewarded) {
@@ -215,45 +202,58 @@ class MainActivity : ComponentActivity() {
       return
     }
 
-    val sAd = StartAppAd(this@MainActivity)
+    // Mark real ad as started immediately so ViewModel fallback timer doesn't cancel it prematurely
+    viewModel.onRealAdStarted()
 
     if (isRewarded) {
-      var isVideoCompleted = false
-      sAd.setVideoListener(object : VideoListener {
-        override fun onVideoCompleted() {
-          Log.d("StartIO", "Start.io Rewarded Video Completed successfully!")
-          isVideoCompleted = true
-        }
-      })
-
-      sAd.loadAd(StartAppAd.AdMode.REWARDED_VIDEO, object : AdEventListener {
-        override fun onReceiveAd(ad: Ad) {
-          viewModel.onRealAdStarted()
-          runOnUiThread {
-            sAd.showAd(object : AdDisplayListener {
+      val readyAd = cachedRewardedAd
+      if (readyAd != null && readyAd.isReady) {
+        Log.d("StartIO", "Displaying preloaded Rewarded Video Ad!")
+        cachedRewardedAd = null
+        readyAd.showAd(object : AdDisplayListener {
+          override fun adDisplayed(ad: Ad) {
+            Log.d("StartIO", "Start.io Rewarded Ad displayed successfully")
+          }
+          override fun adHidden(ad: Ad) {
+            Log.d("StartIO", "Start.io Rewarded Ad closed")
+            viewModel.onRealAdCompleted(adType)
+            preloadStartIoAds()
+          }
+          override fun adClicked(ad: Ad) {}
+          override fun adNotDisplayed(ad: Ad) {
+            Log.w("StartIO", "Start.io Rewarded Ad failed to display")
+            viewModel.onRealAdCompleted(adType)
+            preloadStartIoAds()
+          }
+        })
+      } else {
+        Log.d("StartIO", "Loading fresh Rewarded Video Ad on demand...")
+        val freshAd = StartAppAd(this@MainActivity)
+        freshAd.loadAd(StartAppAd.AdMode.REWARDED_VIDEO, object : AdEventListener {
+          override fun onReceiveAd(ad: Ad) {
+            freshAd.showAd(object : AdDisplayListener {
               override fun adDisplayed(ad: Ad) {
-                Log.d("StartIO", "Start.io Rewarded Ad displayed")
+                Log.d("StartIO", "Fresh Rewarded Ad displayed")
               }
               override fun adHidden(ad: Ad) {
-                Log.d("StartIO", "Start.io Rewarded Ad hidden/closed")
+                Log.d("StartIO", "Fresh Rewarded Ad closed")
                 viewModel.onRealAdCompleted(adType)
                 preloadStartIoAds()
               }
               override fun adClicked(ad: Ad) {}
               override fun adNotDisplayed(ad: Ad) {
-                Log.w("StartIO", "Start.io Rewarded Ad not displayed, falling back to in-app timer")
+                Log.w("StartIO", "Fresh Rewarded Ad not displayed")
+                viewModel.onRealAdCompleted(adType)
+                preloadStartIoAds()
               }
             })
           }
-        }
 
-        override fun onFailedToReceiveAd(ad: Ad?) {
-          Log.e("StartIO", "Start.io Rewarded Ad failed to receive: ${ad?.errorMessage}. Trying Automatic fallback.")
-          val backupAd = StartAppAd(this@MainActivity)
-          backupAd.loadAd(StartAppAd.AdMode.AUTOMATIC, object : AdEventListener {
-            override fun onReceiveAd(a: Ad) {
-              viewModel.onRealAdStarted()
-              runOnUiThread {
+          override fun onFailedToReceiveAd(ad: Ad?) {
+            Log.e("StartIO", "Failed to receive Rewarded Ad: ${ad?.errorMessage}. Trying Automatic fallback...")
+            val backupAd = StartAppAd(this@MainActivity)
+            backupAd.loadAd(StartAppAd.AdMode.AUTOMATIC, object : AdEventListener {
+              override fun onReceiveAd(a: Ad) {
                 backupAd.showAd(object : AdDisplayListener {
                   override fun adDisplayed(a: Ad) {}
                   override fun adHidden(a: Ad) {
@@ -261,45 +261,71 @@ class MainActivity : ComponentActivity() {
                     preloadStartIoAds()
                   }
                   override fun adClicked(a: Ad) {}
-                  override fun adNotDisplayed(a: Ad) {}
+                  override fun adNotDisplayed(a: Ad) {
+                    viewModel.onRealAdCompleted(adType)
+                  }
                 })
               }
-            }
-            override fun onFailedToReceiveAd(a: Ad?) {
-              Log.w("StartIO", "Backup Start.io ad also failed, using in-app video player timer")
-            }
-          })
-        }
-      })
+
+              override fun onFailedToReceiveAd(a: Ad?) {
+                Log.w("StartIO", "Backup Ad also failed to receive")
+                viewModel.onRealAdCompleted(adType)
+              }
+            })
+          }
+        })
+      }
     } else {
-      // Interstitial / Gameplay finish / Reset
-      sAd.loadAd(StartAppAd.AdMode.AUTOMATIC, object : AdEventListener {
-        override fun onReceiveAd(ad: Ad) {
-          viewModel.onRealAdStarted()
-          runOnUiThread {
-            sAd.showAd(object : AdDisplayListener {
+      // Interstitial / Fullscreen ad
+      val readyAd = cachedInterstitialAd
+      if (readyAd != null && readyAd.isReady) {
+        Log.d("StartIO", "Displaying preloaded Interstitial Ad!")
+        cachedInterstitialAd = null
+        readyAd.showAd(object : AdDisplayListener {
+          override fun adDisplayed(ad: Ad) {
+            Log.d("StartIO", "Start.io Interstitial displayed")
+          }
+          override fun adHidden(ad: Ad) {
+            Log.d("StartIO", "Start.io Interstitial closed")
+            viewModel.onRealAdCompleted(adType)
+            preloadStartIoAds()
+          }
+          override fun adClicked(ad: Ad) {}
+          override fun adNotDisplayed(ad: Ad) {
+            Log.w("StartIO", "Start.io Interstitial not displayed")
+            viewModel.onRealAdCompleted(adType)
+            preloadStartIoAds()
+          }
+        })
+      } else {
+        Log.d("StartIO", "Loading fresh Interstitial Ad on demand...")
+        val freshAd = StartAppAd(this@MainActivity)
+        freshAd.loadAd(StartAppAd.AdMode.AUTOMATIC, object : AdEventListener {
+          override fun onReceiveAd(ad: Ad) {
+            freshAd.showAd(object : AdDisplayListener {
               override fun adDisplayed(ad: Ad) {
-                Log.d("StartIO", "Start.io Interstitial displayed")
+                Log.d("StartIO", "Fresh Interstitial displayed")
               }
               override fun adHidden(ad: Ad) {
-                Log.d("StartIO", "Start.io Interstitial hidden")
+                Log.d("StartIO", "Fresh Interstitial closed")
                 viewModel.onRealAdCompleted(adType)
                 preloadStartIoAds()
               }
               override fun adClicked(ad: Ad) {}
               override fun adNotDisplayed(ad: Ad) {
-                Log.w("StartIO", "Start.io Interstitial not displayed")
+                Log.w("StartIO", "Fresh Interstitial not displayed")
                 viewModel.onRealAdCompleted(adType)
+                preloadStartIoAds()
               }
             })
           }
-        }
 
-        override fun onFailedToReceiveAd(ad: Ad?) {
-          Log.e("StartIO", "Start.io Interstitial failed to receive: ${ad?.errorMessage}")
-          viewModel.onRealAdCompleted(adType)
-        }
-      })
+          override fun onFailedToReceiveAd(ad: Ad?) {
+            Log.e("StartIO", "Failed to receive Interstitial Ad: ${ad?.errorMessage}")
+            viewModel.onRealAdCompleted(adType)
+          }
+        })
+      }
     }
   }
 }

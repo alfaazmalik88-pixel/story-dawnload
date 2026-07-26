@@ -2818,11 +2818,11 @@ class LudoViewModel : ViewModel() {
         }
 
         // Set adType to trigger Start.io ad display in MainActivity
-        _uiState.update { it.copy(adType = type, adSecondsLeft = 5, isRealAdShowing = false) }
+        _uiState.update { it.copy(adType = type, adSecondsLeft = 8, isRealAdShowing = false) }
 
         // Keep fallback countdown if Start.io SDK fails to load or fill in time
         viewModelScope.launch {
-            var seconds = 5
+            var seconds = 8
             while (seconds > 0) {
                 delay(1000)
                 val currentState = _uiState.value
