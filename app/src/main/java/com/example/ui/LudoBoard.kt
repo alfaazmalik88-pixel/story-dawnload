@@ -710,7 +710,7 @@ fun LudoBoard(
 
                 Spacer(modifier = Modifier.height(4.dp))
 
-                // Bottom Row: Blue Player (Left) & Yellow Player (Right)
+                // Bottom Row: Blue Player (Left), Guaranteed 6 (Center), Yellow Player (Right)
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -725,33 +725,19 @@ fun LudoBoard(
                         state = state,
                         pulseScale = pulseScale
                     )
-                    PlayerCornerCard(
-                        playerId = 2, // Yellow
-                        viewModel = viewModel,
-                        state = state,
-                        pulseScale = pulseScale
-                    )
-                }
 
-                // Simple minimalist "Guaranteed 6" ad button without any background or status text
-                if (state.gameMode == LudoGameMode.VS_COMPUTER || state.gameMode == LudoGameMode.ONE_VS_ONE) {
-                    val currentPlayer = state.players.firstOrNull { it.id == state.currentPlayerIdx }
-                    val isHumanTurn = currentPlayer?.type == PlayerType.HUMAN && !state.hasRolled && !state.isRolling && !state.isMovingToken
-                    val isSixOnCooldown = state.guaranteedSixCooldownRemaining > 0
-                    val isEligibleForSix = isHumanTurn && !state.nextRollIsSix && !isSixOnCooldown
+                    // "Guaranteed 6" ad button placed in the middle of bottom row, aligned level with player cards
+                    if (state.gameMode == LudoGameMode.VS_COMPUTER || state.gameMode == LudoGameMode.ONE_VS_ONE) {
+                        val currentPlayer = state.players.firstOrNull { it.id == state.currentPlayerIdx }
+                        val isHumanTurn = currentPlayer?.type == PlayerType.HUMAN && !state.hasRolled && !state.isRolling && !state.isMovingToken
+                        val isSixOnCooldown = state.guaranteedSixCooldownRemaining > 0
+                        val isEligibleForSix = isHumanTurn && !state.nextRollIsSix && !isSixOnCooldown
 
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.Center,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
                         Card(
                             modifier = Modifier
-                                .width(if (isSixOnCooldown) 90.dp else 120.dp)
-                                .height(26.dp)
-                                .shadow(if (isEligibleForSix || state.nextRollIsSix) 2.dp else 0.dp, RoundedCornerShape(13.dp))
+                                .width(if (isSixOnCooldown) 84.dp else 110.dp)
+                                .height(28.dp)
+                                .shadow(if (isEligibleForSix || state.nextRollIsSix) 2.dp else 0.dp, RoundedCornerShape(14.dp))
                                 .clickable(enabled = isEligibleForSix || state.nextRollIsSix) {
                                     if (isInternetAvailable(context)) {
                                         viewModel.triggerAd(AdType.GUARANTEED_SIX)
@@ -764,7 +750,7 @@ fun LudoBoard(
                                         ).show()
                                     }
                                 },
-                            shape = RoundedCornerShape(13.dp),
+                            shape = RoundedCornerShape(14.dp),
                             colors = CardDefaults.cardColors(
                                 containerColor = if (state.nextRollIsSix) Color(0xFF065F46) else if (isEligibleForSix) Color(0xFF1E1B4B) else Color(0xFF1E293B)
                             ),
@@ -776,7 +762,7 @@ fun LudoBoard(
                             Row(
                                 modifier = Modifier
                                     .fillMaxSize()
-                                    .padding(horizontal = 8.dp),
+                                    .padding(horizontal = 6.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.Center
                             ) {
@@ -791,11 +777,11 @@ fun LudoBoard(
                                     )
                                 } else {
                                     DiceSixIcon(
-                                        size = 15.dp,
+                                        size = 14.dp,
                                         isEnabled = isEligibleForSix || state.nextRollIsSix,
                                         isNextRollSix = state.nextRollIsSix
                                     )
-                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Spacer(modifier = Modifier.width(3.dp))
                                     Text(
                                         text = if (state.nextRollIsSix) LudoTranslations.getTranslation("six_active", state.selectedLanguage) else LudoTranslations.getTranslation("get_six", state.selectedLanguage),
                                         fontWeight = FontWeight.Bold,
@@ -806,6 +792,13 @@ fun LudoBoard(
                             }
                         }
                     }
+
+                    PlayerCornerCard(
+                        playerId = 2, // Yellow
+                        viewModel = viewModel,
+                        state = state,
+                        pulseScale = pulseScale
+                    )
                 }
             }
 
