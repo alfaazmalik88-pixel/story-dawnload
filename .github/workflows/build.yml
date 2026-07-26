@@ -1,4 +1,4 @@
-name: Build All APKs
+name: Build Android APK
 
 on:
   push:
@@ -20,19 +20,19 @@ jobs:
         distribution: 'temurin'
         cache: gradle
 
-    - name: Grant execute permission for gradlew
-      run: chmod +x gradlew
+    - name: Build Debug & Release APK
+      run: gradle assembleDebug assembleRelease --stacktrace
 
-    - name: Build APKs
-      run: |
-        ./gradlew assembleRelease || echo "Release build failed, proceeding with debug"
-        ./gradlew assembleDebug
-
-    - name: Upload APK Artifacts
+    - name: Upload Debug APK
       uses: actions/upload-artifact@v4
+      if: always()
       with:
-        name: all-apks
-        path: app/build/outputs/apk/**/*.apk
+        name: app-debug-apk
+        path: app/build/outputs/apk/debug/*.apk
 
-
-        
+    - name: Upload Release APK
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: app-release-apk
+        path: app/build/outputs/apk/release/*.apk

@@ -63,12 +63,19 @@ android {
     create("release") {
       val keystorePath = System.getenv("KEYSTORE_PATH")
       val customKs = if (!keystorePath.isNullOrEmpty()) file(keystorePath) else null
+      val rootReleaseKs = file("${rootDir}/release-key.jks")
       val rootDebugKs = file("${rootDir}/debug.keystore")
+
       if (customKs != null && customKs.exists()) {
         storeFile = customKs
         storePassword = System.getenv("STORE_PASSWORD") ?: "android"
         keyAlias = System.getenv("KEY_ALIAS") ?: "upload"
         keyPassword = System.getenv("KEY_PASSWORD") ?: "android"
+      } else if (rootReleaseKs.exists()) {
+        storeFile = rootReleaseKs
+        storePassword = "androidrelease"
+        keyAlias = "releasekey"
+        keyPassword = "androidrelease"
       } else if (rootDebugKs.exists()) {
         storeFile = rootDebugKs
         storePassword = "android"
@@ -86,9 +93,10 @@ android {
       
       val keystorePath = System.getenv("KEYSTORE_PATH")
       val customKs = if (!keystorePath.isNullOrEmpty()) file(keystorePath) else null
+      val rootReleaseKs = file("${rootDir}/release-key.jks")
       val rootDebugKs = file("${rootDir}/debug.keystore")
       
-      if ((customKs != null && customKs.exists()) || rootDebugKs.exists()) {
+      if ((customKs != null && customKs.exists()) || rootReleaseKs.exists() || rootDebugKs.exists()) {
         signingConfig = signingConfigs.getByName("release")
       } else {
         signingConfig = signingConfigs.getByName("debug")
