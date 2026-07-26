@@ -23,13 +23,13 @@ jobs:
     - name: Fix Corrupt Gradle Wrapper
       run: |
         rm -rf gradle/wrapper/gradle-wrapper.jar
-        gradle wrapper --gradle-version 8.5
+        gradle wrapper --gradle-version 9.3.1
 
     - name: Grant execute permission for gradlew
       run: chmod +x gradlew
 
     - name: Build Debug and Release APK
-      run: ./gradlew assembleDebug assembleRelease -Dorg.gradle.project.android.injected.version.check=false
+      run: ./gradlew assembleDebug assembleRelease
 
     - name: Upload Debug APK
       uses: actions/upload-artifact@v4
