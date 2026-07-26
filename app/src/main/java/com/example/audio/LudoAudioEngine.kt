@@ -248,10 +248,11 @@ object LudoAudioEngine {
         type: WaveType
     ) {
         val numSamples = (SAMPLE_RATE * (durationMs / 1000.0)).toInt()
+        if (numSamples <= 0) return
         val samples = ShortArray(numSamples)
 
-        val attackSamples = (numSamples * 0.15).toInt()
-        val decaySamples = (numSamples * 0.85).toInt()
+        val attackSamples = (numSamples * 0.15).toInt().coerceAtLeast(1)
+        val releaseSamples = (numSamples * 0.25).toInt().coerceAtLeast(1)
 
         for (i in 0 until numSamples) {
             val t = i.toDouble() / SAMPLE_RATE
@@ -265,10 +266,11 @@ object LudoAudioEngine {
                 }
             }
 
-            // Envelope
+            // Smooth ASR Envelope with zero-crossing guarantee at start and end to eliminate clicks/buzzing
             val env = when {
                 i < attackSamples -> (i.toFloat() / attackSamples)
-                else -> (1.0f - (i - attackSamples).toFloat() / decaySamples).coerceIn(0f, 1f)
+                i >= numSamples - releaseSamples -> ((numSamples - 1 - i).toFloat() / releaseSamples).coerceIn(0f, 1f)
+                else -> 1.0f
             }
 
             samples[i] = (waveVal * Short.MAX_VALUE * volume * env).toInt()
@@ -395,12 +397,12 @@ object LudoAudioEngine {
     }
 
     fun playDiceRoll() {
-        // Highlighted, highly realistic, loud dice shaking & rolling sound ("Dish ki Awaj")
+        // Soft, realistic wooden dice tumbling & rolling sound ("Goti/Pasa ki smooth awaj")
         playSequence(
-            listOf(280.0, 720.0, 480.0, 920.0, 580.0, 1050.0, 410.0, 1250.0, 310.0, 1500.0, 220.0),
-            listOf(18, 18, 18, 18, 18, 18, 18, 20, 20, 25, 75),
-            volume = 0.70f,
-            type = WaveType.TRIANGLE
+            listOf(220.0, 380.0, 260.0, 420.0, 310.0, 240.0, 350.0, 200.0, 180.0),
+            listOf(20, 22, 20, 22, 25, 25, 30, 35, 60),
+            volume = 0.35f,
+            type = WaveType.SINE
         )
     }
 
@@ -408,13 +410,13 @@ object LudoAudioEngine {
         // High impact capture/cut sound
         val freqs = mutableListOf<Double>()
         val durs = mutableListOf<Int>()
-        var f = 1200.0
-        while (f >= 200.0) {
+        var f = 900.0
+        while (f >= 220.0) {
             freqs.add(f)
             durs.add(15)
-            f -= 70.0
+            f -= 80.0
         }
-        playSequence(freqs, durs, volume = 0.40f, type = WaveType.SQUARE)
+        playSequence(freqs, durs, volume = 0.30f, type = WaveType.TRIANGLE)
     }
 
     fun playVictory() {

@@ -1293,6 +1293,10 @@ fun LudoMenu(
                             testTag = "mode_1v1",
                             onClick = {
                                 viewModel.selectGameMode(LudoGameMode.ONE_VS_ONE)
+                                if (!isInternetAvailable(context)) {
+                                    noInternetNoticeMode = LudoGameMode.ONE_VS_ONE
+                                    showNoInternetDialog = true
+                                }
                             },
                             modifier = Modifier.weight(1f)
                         )
@@ -1564,7 +1568,7 @@ fun LudoMenu(
                     Button(
                         onClick = {
                             val currentMode = uiState.gameMode
-                            if (currentMode == LudoGameMode.HYBRID_ONLINE && !isInternetAvailable(context)) {
+                            if ((currentMode == LudoGameMode.HYBRID_ONLINE || currentMode == LudoGameMode.ONE_VS_ONE) && !isInternetAvailable(context)) {
                                 noInternetNoticeMode = currentMode
                                 showNoInternetDialog = true
                             } else {

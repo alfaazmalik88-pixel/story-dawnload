@@ -1420,7 +1420,8 @@ class LudoViewModel : ViewModel() {
         val isWagerMode = mode == LudoGameMode.ONE_VS_ONE || mode == LudoGameMode.HYBRID_ONLINE
         val wager = uiState.value.selectedWagerAmount
 
-        if (mode == LudoGameMode.HYBRID_ONLINE) {
+        val isOnlineOrWagerInternetNeeded = mode == LudoGameMode.HYBRID_ONLINE || mode == LudoGameMode.ONE_VS_ONE
+        if (isOnlineOrWagerInternetNeeded) {
             if (!isInternetAvailable()) {
                 val netMsg = LudoTranslations.getTranslation("internet_required_desc_online", lang)
                 _uiState.update { it.copy(statusMessage = "❌ $netMsg") }
@@ -1906,7 +1907,8 @@ class LudoViewModel : ViewModel() {
                                     else -> LudoColor.RED
                                 }
                             }
-                            updatedPlayers.add(Player(id = slot, name = name, color = color, type = PlayerType.HUMAN, avatarId = avatarId))
+                            val slotType = if (slot == myFirebasePlayerSlot) PlayerType.HUMAN else PlayerType.BOT
+                            updatedPlayers.add(Player(id = slot, name = name, color = color, type = slotType, avatarId = avatarId))
                         } else {
                             if (status == "waiting") {
                                 val placeholderColor = when (slot) {
@@ -1977,21 +1979,42 @@ class LudoViewModel : ViewModel() {
         val players = mutableListOf<Player>()
         val tokens = mutableListOf<Token>()
         
-        for (slotSnap in playersSnapshot.children) {
-            val slotKey = slotSnap.key ?: continue
-            val slotId = slotKey.toIntOrNull() ?: continue
-            val name = slotSnap.child("name").getValue(String::class.java) ?: "Player ${slotId + 1}"
-            val avatarId = slotSnap.child("avatarId").getValue(Int::class.java) ?: 0
-            val colorStr = slotSnap.child("color").getValue(String::class.java) ?: "RED"
-            val color = try { LudoColor.valueOf(colorStr) } catch(e: Exception) {
-                when (slotId) {
-                    3 -> LudoColor.BLUE
+        val targetPlayerCount = snapshot.child("targetPlayerCount").getValue(Int::class.java) ?: 2
+        val expectedSlots = when (targetPlayerCount) {
+            2 -> listOf(3, 1)
+            3 -> listOf(3, 0, 1)
+            else -> listOf(3, 0, 1, 2)
+        }
+
+        val shuffledNames = realisticPlayerNames.shuffled().toMutableList()
+
+        for (slotId in expectedSlots) {
+            val slotSnap = playersSnapshot.child(slotId.toString())
+            if (slotSnap.exists()) {
+                val name = slotSnap.child("name").getValue(String::class.java) ?: "Player ${slotId + 1}"
+                val avatarId = slotSnap.child("avatarId").getValue(Int::class.java) ?: 0
+                val colorStr = slotSnap.child("color").getValue(String::class.java) ?: "RED"
+                val color = try { LudoColor.valueOf(colorStr) } catch(e: Exception) {
+                    when (slotId) {
+                        3 -> LudoColor.BLUE
+                        0 -> LudoColor.YELLOW
+                        1 -> LudoColor.GREEN
+                        else -> LudoColor.RED
+                    }
+                }
+                // Only local user slot is HUMAN. Remote slots are BOT locally so AI handles turns if Firebase updates lag or drop
+                val pType = if (slotId == myFirebasePlayerSlot) PlayerType.HUMAN else PlayerType.BOT
+                players.add(Player(id = slotId, name = name, color = color, type = pType, avatarId = avatarId))
+            } else {
+                val color = when (slotId) {
                     0 -> LudoColor.YELLOW
                     1 -> LudoColor.GREEN
-                    else -> LudoColor.RED
+                    2 -> LudoColor.RED
+                    else -> LudoColor.BLUE
                 }
+                val pName = if (shuffledNames.isNotEmpty()) shuffledNames.removeAt(0) else "Player_${slotId + 1}"
+                players.add(Player(id = slotId, name = pName, color = color, type = PlayerType.BOT, avatarId = (0..12).random()))
             }
-            players.add(Player(id = slotId, name = name, color = color, type = PlayerType.HUMAN, avatarId = avatarId))
         }
 
         players.sortBy { it.id }
@@ -2012,7 +2035,7 @@ class LudoViewModel : ViewModel() {
                 isFindingOpponent = false,
                 players = players,
                 tokens = tokens,
-                currentPlayerIdx = 3, // Host goes first!
+                currentPlayerIdx = players.first().id,
                 diceRoll = null,
                 hasRolled = false,
                 isRolling = false,
@@ -2020,6 +2043,7 @@ class LudoViewModel : ViewModel() {
             )
         }
         startTurnTimer(LudoGameMode.HYBRID_ONLINE)
+        triggerBotIfNeeded()
     }
 
     private fun syncLocalStateToFirebase(actionType: String, actionMsg: String) {
