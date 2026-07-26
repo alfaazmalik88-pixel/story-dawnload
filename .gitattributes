@@ -1,0 +1,9 @@
+# Treat all binary files as binary to prevent CRLF line ending corruption
+*.jar binary
+*.keystore binary
+*.jks binary
+*.png binary
+*.jpg binary
+*.webp binary
+*.aar binary
+*.so binary
