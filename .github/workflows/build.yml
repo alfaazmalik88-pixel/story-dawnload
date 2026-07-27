@@ -28,20 +28,17 @@ jobs:
     - name: Grant execute permission for gradlew
       run: chmod +x gradlew
 
-    - name: Setup Keystore and Ensure Google Services
+    - name: Setup Keystore
       run: |
         if [ ! -f "app/release-key.jks" ]; then
           keytool -genkey -v -keystore app/release-key.jks -keyalg RSA -keysize 2048 -validity 10000 -alias releasekey -storepass android123 -keypass android123 -dname "CN=Android, OU=Dev, O=Local, L=Unknown, ST=Unknown, C=IN"
         fi
-        if [ ! -f "app/google-services.json" ]; then
-          echo '{"project_info": {"project_number": "123456789", "project_id": "dummy-project"}, "client": [{"client_info": {"mobilesdk_app_id": "1:1234:android:1234"}, "oauth_client": [], "api_key": [{"current_key": "AIzaSyDummyKey"}], "services": {"analytics_service": {"status": 1}, "app_metrica_service": {"status": 1}, "ads_service": {"status": 2}}}]}' > app/google-services.json
-        fi
 
     - name: Build Debug APK
-      run: ./gradlew assembleDebug
+      run: ./gradlew assembleDebug -Pcom.google.gms.googleservices.id-enabled=false
 
     - name: Build Release APK
-      run: ./gradlew assembleRelease -Pandroid.injected.signing.store.file="release-key.jks" -Pandroid.injected.signing.store.password="android123" -Pandroid.injected.signing.key.alias="releasekey" -Pandroid.injected.signing.key.password="android123"
+      run: ./gradlew assembleRelease -Pcom.google.gms.googleservices.id-enabled=false -Pandroid.injected.signing.store.file="release-key.jks" -Pandroid.injected.signing.store.password="android123" -Pandroid.injected.signing.key.alias="releasekey" -Pandroid.injected.signing.key.password="android123"
 
     - name: Upload Debug APK
       uses: actions/upload-artifact@v4
