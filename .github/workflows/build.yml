@@ -28,9 +28,43 @@ jobs:
     - name: Grant execute permission for gradlew
       run: chmod +x gradlew
 
-    - name: Inject Google Services JSON
+    - name: Create Valid Dummy Google Services JSON
       run: |
-        echo '${{ secrets.GOOGLE_SERVICES_JSON }}' > app/google-services.json
+        echo '{
+          "project_info": {
+            "project_number": "1234567890",
+            "project_id": "story-download-app",
+            "storage_bucket": "story-download-app.appspot.com"
+          },
+          "client": [
+            {
+              "client_info": {
+                "mobilesdk_app_id": "1:1234567890:android:1234567890abcdef",
+                "android_client_info": {
+                  "package_name": "com.kamar.storydownloader"
+                }
+              },
+              "oauth_client": [],
+              "api_key": [
+                {
+                  "current_key": "AIzaSyDummyKeyForBuildOnly12345"
+                }
+              ],
+              "services": {
+                "analytics_service": {
+                  "status": 1
+                },
+                "app_invite_service": {
+                  "status": 1
+                },
+                "ads_service": {
+                  "status": 1
+                }
+              }
+            }
+          ],
+          "configuration_version": "1"
+        }' > app/google-services.json
 
     - name: Setup Release Keystore
       run: |
