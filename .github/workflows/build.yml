@@ -1,4 +1,4 @@
-name: Build Debug & Release APK
+name: Build Debug APK
 
 on:
   push:
@@ -28,26 +28,11 @@ jobs:
     - name: Grant execute permission for gradlew
       run: chmod +x gradlew
 
-    - name: Setup Keystore
-      run: |
-        if [ ! -f "app/release-key.jks" ]; then
-          keytool -genkey -v -keystore app/release-key.jks -keyalg RSA -keysize 2048 -validity 10000 -alias releasekey -storepass android123 -keypass android123 -dname "CN=Android, OU=Dev, O=Local, L=Unknown, ST=Unknown, C=IN"
-        fi
-
     - name: Build Debug APK
       run: ./gradlew assembleDebug -Pcom.google.gms.googleservices.id-enabled=false
-
-    - name: Build Release APK
-      run: ./gradlew assembleRelease -Pcom.google.gms.googleservices.id-enabled=false -Pandroid.injected.signing.store.file="release-key.jks" -Pandroid.injected.signing.store.password="android123" -Pandroid.injected.signing.key.alias="releasekey" -Pandroid.injected.signing.key.password="android123"
 
     - name: Upload Debug APK
       uses: actions/upload-artifact@v4
       with:
         name: app-debug-apk
         path: app/build/outputs/apk/debug/*.apk
-
-    - name: Upload Release APK
-      uses: actions/upload-artifact@v4
-      with:
-        name: app-release-apk
-        path: app/build/outputs/apk/release/*.apk
