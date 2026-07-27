@@ -20,7 +20,7 @@ jobs:
         distribution: 'temurin'
         cache: gradle
 
-    - name: Fix Corrupt Gradle Wrapper
+    - name: Fix Corrupt Gradle Wrapper & Set Version
       run: |
         rm -rf gradle/wrapper/gradle-wrapper.jar
         gradle wrapper --gradle-version 9.3.1
@@ -28,8 +28,14 @@ jobs:
     - name: Grant execute permission for gradlew
       run: chmod +x gradlew
 
+    - name: Setup Automatic Release Keystore
+      run: |
+        if [ ! -f "release-key.jks" ]; then
+          keytool -genkey -v -keystore release-key.jks -keyalg RSA -keysize 2048 -validity 10000 -alias releasekey -storepass android -keypass android -dname "CN=Android, OU=Dev, O=Local, L=Unknown, ST=Unknown, C=IN"
+        fi
+
     - name: Build Debug and Release APK
-      run: ./gradlew assembleDebug assembleRelease -Pandroid.injected.signing.store.file=""
+      run: ./gradlew assembleDebug assembleRelease -Pandroid.injected.signing.store.file="release-key.jks" -Pandroid.injected.signing.store.password="android" -Pandroid.injected.signing.key.alias="releasekey" -Pandroid.injected.signing.key.password="android"
 
     - name: Upload Debug APK
       uses: actions/upload-artifact@v4
@@ -42,4 +48,3 @@ jobs:
       with:
         name: app-release-apk
         path: app/build/outputs/apk/release/*.apk
-        
