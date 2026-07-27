@@ -1,4 +1,4 @@
-name: Build Android APK
+name: Build Release App Bundle & APK
 
 on:
   push:
@@ -18,52 +18,38 @@ jobs:
       with:
         java-version: '17'
         distribution: 'temurin'
+        cache: gradle
 
-    - name: Setup Android SDK
-      uses: android-actions/setup-android@v3
-
-    - name: Setup Gradle
-      uses: gradle/actions/setup-gradle@v4
-      with:
-        gradle-version: '8.11.1'
-
-    - name: Regenerate Clean Gradle Wrapper
+    - name: Fix Corrupt Gradle Wrapper & Set Version
       run: |
-        gradle wrapper --gradle-version 8.11.1
-        chmod +x gradlew
+        rm -rf gradle/wrapper/gradle-wrapper.jar
+        gradle wrapper --gradle-version 9.3.1
 
-    - name: Setup Keystore
-      env:
-        RELEASE_KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
+    - name: Grant execute permission for gradlew
+      run: chmod +x gradlew
+
+    - name: Inject Google Services JSON
       run: |
-        if [ -n "$RELEASE_KEYSTORE_BASE64" ]; then
-          echo "Decoding release keystore from GitHub secrets..."
-          echo "$RELEASE_KEYSTORE_BASE64" | base64 --decode > release-key.jks
-        fi
-        if [ -f "release-key.jks" ]; then
-          if ! keytool -list -keystore release-key.jks -storepass androidrelease >/dev/null 2>&1; then
-            echo "Removing corrupted release-key.jks..."
-            rm -f release-key.jks
-          fi
-        fi
-        if [ ! -f "release-key.jks" ]; then
-          echo "Generating clean release keystore..."
-          keytool -genkey -v -keystore release-key.jks -keyalg RSA -keysize 2048 -validity 10000 -alias releasekey -storepass androidrelease -keypass androidrelease -dname "CN=LudoRelease, OU=Mobile, O=AIStudio, L=City, ST=State, C=US"
-        fi
+        echo '${{ secrets.GOOGLE_SERVICES_JSON }}' > app/google-services.json
 
-    - name: Build Debug & Release APK
-      run: ./gradlew assembleDebug assembleRelease --stacktrace
+    - name: Setup Release Keystore
+      run: |
+        keytool -genkey -v -keystore app/release-key.jks -keyalg RSA -keysize 2048 -validity 10000 -alias releasekey -storepass android123 -keypass android123 -dname "CN=Android, OU=Dev, O=Local, L=Unknown, ST=Unknown, C=IN"
 
-    - name: Upload Debug APK
+    - name: Build Release App Bundle (.aab)
+      run: ./gradlew bundleRelease -Pandroid.injected.signing.store.file="release-key.jks" -Pandroid.injected.signing.store.password="android123" -Pandroid.injected.signing.key.alias="releasekey" -Pandroid.injected.signing.key.password="android123"
+
+    - name: Build Release APK
+      run: ./gradlew assembleRelease -Pandroid.injected.signing.store.file="release-key.jks" -Pandroid.injected.signing.store.password="android123" -Pandroid.injected.signing.key.alias="releasekey" -Pandroid.injected.signing.key.password="android123"
+
+    - name: Upload Release App Bundle
       uses: actions/upload-artifact@v4
-      if: always()
       with:
-        name: app-debug-apk
-        path: app/build/outputs/apk/debug/*.apk
+        name: app-release-bundle
+        path: app/build/outputs/bundle/release/*.aab
 
     - name: Upload Release APK
       uses: actions/upload-artifact@v4
-      if: always()
       with:
         name: app-release-apk
         path: app/build/outputs/apk/release/*.apk
