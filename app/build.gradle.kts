@@ -1,5 +1,6 @@
 import com.google.gms.googleservices.GoogleServicesPlugin.MissingGoogleServicesStrategy
 import java.io.File
+import java.security.KeyStore
 import java.util.Properties
 
 fun getSanitizedEnvSecret(rootDir: File, key: String): String {
@@ -27,7 +28,28 @@ fun getSanitizedEnvSecret(rootDir: File, key: String): String {
 
 fun ensureReleaseKeystoreExists(rootDir: File): File {
   val releaseKs = File(rootDir, "release-key.jks")
-  if (!releaseKs.exists()) {
+  var isValid = false
+  if (releaseKs.exists() && releaseKs.length() > 500) {
+    try {
+      val ks = KeyStore.getInstance("PKCS12")
+      val stream = releaseKs.inputStream()
+      try {
+        ks.load(stream, "androidrelease".toCharArray())
+        if (ks.containsAlias("releasekey")) {
+          isValid = true
+        }
+      } finally {
+        stream.close()
+      }
+    } catch (e: Exception) {
+      isValid = false
+    }
+  }
+
+  if (!isValid) {
+    if (releaseKs.exists()) {
+      releaseKs.delete()
+    }
     try {
       val process = ProcessBuilder(
         "keytool", "-genkey", "-v",
