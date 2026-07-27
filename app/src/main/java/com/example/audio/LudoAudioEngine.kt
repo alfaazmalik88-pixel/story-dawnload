@@ -15,15 +15,16 @@ enum class WaveType {
 
 object LudoAudioEngine {
     private const val TAG = "LudoAudioEngine"
-    private const val SAMPLE_RATE = 22050
+    private const val SAMPLE_RATE = 44100
 
-    // Shared Coroutine Scope for BGM and SFX
+    // Dedicated Coroutine Scope & Single Thread Executor for ultra-low latency SFX
     private val audioScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val sfxExecutor = Executors.newSingleThreadExecutor()
     private val sfxDispatcher = sfxExecutor.asCoroutineDispatcher()
 
     private var mediaPlayer: MediaPlayer? = null
     private var bgmTrack: AudioTrack? = null
+    private var sfxTrack: AudioTrack? = null
     private var bgmJob: Job? = null
     private var appContext: Context? = null
 
@@ -52,6 +53,51 @@ object LudoAudioEngine {
                 startBgm()
             }
         }
+
+    @Synchronized
+    private fun getSfxTrack(): AudioTrack? {
+        if (!isSoundEnabled) return null
+        if (sfxTrack == null) {
+            try {
+                val minBuff = AudioTrack.getMinBufferSize(
+                    SAMPLE_RATE,
+                    AudioFormat.CHANNEL_OUT_MONO,
+                    AudioFormat.ENCODING_PCM_16BIT
+                ).coerceAtLeast(16384)
+
+                val track = AudioTrack.Builder()
+                    .setAudioAttributes(
+                        AudioAttributes.Builder()
+                            .setUsage(AudioAttributes.USAGE_GAME)
+                            .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                            .build()
+                    )
+                    .setAudioFormat(
+                        AudioFormat.Builder()
+                            .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
+                            .setSampleRate(SAMPLE_RATE)
+                            .setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
+                            .build()
+                    )
+                    .setBufferSizeInBytes(minBuff)
+                    .setTransferMode(AudioTrack.MODE_STREAM)
+                    .build()
+
+                track.play()
+                sfxTrack = track
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to initialize persistent SFX AudioTrack", e)
+                sfxTrack = null
+            }
+        } else {
+            try {
+                if (sfxTrack?.playState != AudioTrack.PLAYSTATE_PLAYING) {
+                    sfxTrack?.play()
+                }
+            } catch (e: Exception) { /* ignore */ }
+        }
+        return sfxTrack
+    }
 
     fun startBgm(context: Context? = appContext) {
         if (context != null) {
@@ -121,6 +167,7 @@ object LudoAudioEngine {
             }
 
             if (startedMp) return@launch
+
             // Classic Upbeat Cheerful Ludo Theme Song Melody
             val classicMelody = listOf(
                 Note(523.25, 200), Note(587.33, 200), Note(659.25, 200), Note(783.99, 400),
@@ -133,32 +180,28 @@ object LudoAudioEngine {
                 Note(880.00, 200), Note(783.99, 200), Note(659.25, 200), Note(523.25, 600)
             )
 
-            // Gulf / Middle-Eastern Arabian Oud Hijaz Scale melody list (Rich, catchy game melody)
+            // Gulf / Middle-Eastern Arabian Oud Hijaz Scale melody list
             val gulfMelody = listOf(
-                // Section A: Festive Gulf Oud Opening Motif (Bouncy game intro)
-                Note(392.0, 180), Note(415.3, 180), Note(493.9, 360), // G4, Ab4, B4
-                Note(493.9, 180), Note(523.3, 180), Note(493.9, 180), Note(415.3, 180), Note(392.0, 360), // B4, C5, B4, Ab4, G4
-                Note(392.0, 180), Note(415.3, 180), Note(493.9, 180), Note(523.3, 180), Note(587.3, 360), // G4, Ab4, B4, C5, D5
-                Note(587.3, 180), Note(622.3, 180), Note(587.3, 180), Note(523.3, 180), Note(493.9, 360), // D5, Eb5, D5, C5, B4
+                Note(392.0, 180), Note(415.3, 180), Note(493.9, 360),
+                Note(493.9, 180), Note(523.3, 180), Note(493.9, 180), Note(415.3, 180), Note(392.0, 360),
+                Note(392.0, 180), Note(415.3, 180), Note(493.9, 180), Note(523.3, 180), Note(587.3, 360),
+                Note(587.3, 180), Note(622.3, 180), Note(587.3, 180), Note(523.3, 180), Note(493.9, 360),
 
-                // Section B: Bouncy Gulf Game Rhythm Climb
-                Note(493.9, 180), Note(523.3, 180), Note(587.3, 180), Note(622.3, 180), Note(739.99, 360), // B4, C5, D5, Eb5, F#5
-                Note(783.99, 250), Note(739.99, 180), Note(622.3, 180), Note(587.3, 360), // G5, F#5, Eb5, D5
-                Note(587.3, 180), Note(523.3, 180), Note(493.9, 180), Note(415.3, 180), Note(392.0, 500), // D5, C5, B4, Ab4, G4
+                Note(493.9, 180), Note(523.3, 180), Note(587.3, 180), Note(622.3, 180), Note(739.99, 360),
+                Note(783.99, 250), Note(739.99, 180), Note(622.3, 180), Note(587.3, 360),
+                Note(587.3, 180), Note(523.3, 180), Note(493.9, 180), Note(415.3, 180), Note(392.0, 500),
 
-                // Section C: Fast Trills & Festive Arabian Cadence
-                Note(392.0, 150), Note(493.9, 150), Note(587.3, 150), Note(783.99, 300), // G4, B4, D5, G5
-                Note(739.99, 150), Note(622.3, 150), Note(587.3, 150), Note(523.3, 150), Note(493.9, 300), // F#5, Eb5, D5, C5, B4
-                Note(415.3, 150), Note(493.9, 150), Note(523.3, 150), Note(493.9, 150), Note(415.3, 150), Note(392.0, 450), // Ab4, B4, C5, B4, Ab4, G4
+                Note(392.0, 150), Note(493.9, 150), Note(587.3, 150), Note(783.99, 300),
+                Note(739.99, 150), Note(622.3, 150), Note(587.3, 150), Note(523.3, 150), Note(493.9, 300),
+                Note(415.3, 150), Note(493.9, 150), Note(523.3, 150), Note(493.9, 150), Note(415.3, 150), Note(392.0, 450),
 
-                // Section D: Ending Resolution Bounce
-                Note(392.0, 180), Note(587.3, 180), Note(392.0, 180), Note(587.3, 180), // G4, D5, G4, D5
-                Note(493.9, 180), Note(523.3, 180), Note(415.3, 180), Note(392.0, 600)  // B4, C5, Ab4, G4
+                Note(392.0, 180), Note(587.3, 180), Note(392.0, 180), Note(587.3, 180),
+                Note(493.9, 180), Note(523.3, 180), Note(415.3, 180), Note(392.0, 600)
             )
 
             var noteIndex = 0
 
-            // Resilient infinite BGM loop - automatically recovers track if system audio drops
+            // Resilient infinite BGM loop with continuous audio streaming
             while (isActive && isMusicEnabled) {
                 var currentTrack: AudioTrack? = null
                 try {
@@ -166,7 +209,7 @@ object LudoAudioEngine {
                         SAMPLE_RATE,
                         AudioFormat.CHANNEL_OUT_MONO,
                         AudioFormat.ENCODING_PCM_16BIT
-                    ).coerceAtLeast(16384)
+                    ).coerceAtLeast(32768)
 
                     val track = AudioTrack.Builder()
                         .setAudioAttributes(
@@ -194,15 +237,21 @@ object LudoAudioEngine {
                         val isGulf = currentMusicMode == "GULF"
                         val melody = if (isGulf) gulfMelody else classicMelody
                         val note = melody[noteIndex % melody.size]
-                        
-                        if (isGulf) {
-                            writeOudToneToTrack(track, note.frequency, note.durationMs, volume = 0.28f)
+
+                        val notePcm = if (isGulf) {
+                            generateOudToneBuffer(note.frequency, note.durationMs, volume = 0.28f)
                         } else {
-                            writeToneToTrack(track, note.frequency, note.durationMs, volume = 0.15f, type = WaveType.TRIANGLE)
+                            generateToneBuffer(note.frequency, note.durationMs, volume = 0.18f, type = WaveType.TRIANGLE)
                         }
-                        
+
+                        // Seamlessly write note PCM + small gap silence directly to AudioTrack (no coroutine delays)
+                        track.write(notePcm, 0, notePcm.size)
+
+                        val gapMs = if (isGulf) 25 else 45
+                        val silenceBuffer = generateSilenceBuffer(gapMs)
+                        track.write(silenceBuffer, 0, silenceBuffer.size)
+
                         noteIndex++
-                        delay(if (isGulf) 30 else 50) // Crisp articulation interval
                     }
                 } catch (e: CancellationException) {
                     throw e
@@ -240,19 +289,18 @@ object LudoAudioEngine {
         }
     }
 
-    private fun writeToneToTrack(
-        track: AudioTrack,
+    private fun generateToneBuffer(
         frequency: Double,
         durationMs: Int,
         volume: Float,
         type: WaveType
-    ) {
+    ): ShortArray {
         val numSamples = (SAMPLE_RATE * (durationMs / 1000.0)).toInt()
-        if (numSamples <= 0) return
+        if (numSamples <= 0) return ShortArray(0)
         val samples = ShortArray(numSamples)
 
-        val attackSamples = (numSamples * 0.15).toInt().coerceAtLeast(1)
-        val releaseSamples = (numSamples * 0.25).toInt().coerceAtLeast(1)
+        val attackSamples = (SAMPLE_RATE * 0.003).toInt().coerceAtLeast(1) // 3ms smooth attack
+        val releaseSamples = (SAMPLE_RATE * 0.006).toInt().coerceAtLeast(1) // 6ms smooth release
 
         for (i in 0 until numSamples) {
             val t = i.toDouble() / SAMPLE_RATE
@@ -266,38 +314,33 @@ object LudoAudioEngine {
                 }
             }
 
-            // Smooth ASR Envelope with zero-crossing guarantee at start and end to eliminate clicks/buzzing
             val env = when {
                 i < attackSamples -> (i.toFloat() / attackSamples)
                 i >= numSamples - releaseSamples -> ((numSamples - 1 - i).toFloat() / releaseSamples).coerceIn(0f, 1f)
                 else -> 1.0f
             }
 
-            samples[i] = (waveVal * Short.MAX_VALUE * volume * env).toInt()
+            samples[i] = (waveVal * 32767.0 * volume * env).toInt()
                 .coerceIn(Short.MIN_VALUE.toInt(), Short.MAX_VALUE.toInt()).toShort()
         }
-        track.write(samples, 0, numSamples)
+        return samples
     }
 
-    private fun writeOudToneToTrack(
-        track: AudioTrack,
+    private fun generateOudToneBuffer(
         frequency: Double,
         durationMs: Int,
         volume: Float = 0.28f
-    ) {
+    ): ShortArray {
         val numSamples = (SAMPLE_RATE * (durationMs / 1000.0)).toInt()
-        if (numSamples <= 0) return
+        if (numSamples <= 0) return ShortArray(0)
         val samples = ShortArray(numSamples)
 
-        val attackMs = 10.0
-        val attackSamples = (SAMPLE_RATE * (attackMs / 1000.0)).toInt().coerceIn(1, numSamples)
+        val attackSamples = (SAMPLE_RATE * 0.008).toInt().coerceIn(1, numSamples)
 
         for (i in 0 until numSamples) {
             val t = i.toDouble() / SAMPLE_RATE
             val angle = 2.0 * Math.PI * frequency * t
 
-            // Oud / Qanun oriental string harmonics synthesis:
-            // Fundamental + 2nd octave + 3rd harmonic + subtle 4th
             val fundamental = Math.sin(angle)
             val oct1 = 0.45 * Math.sin(2.0 * angle)
             val oct2 = 0.20 * Math.sin(3.0 * angle)
@@ -305,7 +348,6 @@ object LudoAudioEngine {
 
             val waveVal = (fundamental + oct1 + oct2 + oct3) / 1.75
 
-            // Plucked string envelope: sharp attack, natural exponential release
             val env = if (i < attackSamples) {
                 (i.toFloat() / attackSamples)
             } else {
@@ -313,96 +355,93 @@ object LudoAudioEngine {
                 Math.exp(-2.6 * progress).toFloat()
             }
 
-            samples[i] = (waveVal * Short.MAX_VALUE * volume * env).toInt()
+            samples[i] = (waveVal * 32767.0 * volume * env).toInt()
                 .coerceIn(Short.MIN_VALUE.toInt(), Short.MAX_VALUE.toInt()).toShort()
         }
-        track.write(samples, 0, numSamples)
+        return samples
+    }
+
+    private fun generateSilenceBuffer(durationMs: Int): ShortArray {
+        val numSamples = (SAMPLE_RATE * (durationMs / 1000.0)).toInt()
+        if (numSamples <= 0) return ShortArray(0)
+        return ShortArray(numSamples)
     }
 
     private fun playSequence(
         frequencies: List<Double>,
         durationsMs: List<Int>,
-        volume: Float = 0.25f,
-        type: WaveType = WaveType.TRIANGLE,
-        gapMs: Long = 0
+        volume: Float = 0.35f,
+        type: WaveType = WaveType.SINE,
+        gapMs: Int = 0
     ) {
         if (!isSoundEnabled) return
+
+        // Compute total combined PCM buffer length
+        var totalSamples = 0
+        for (dur in durationsMs) {
+            totalSamples += (SAMPLE_RATE * (dur / 1000.0)).toInt()
+            if (gapMs > 0) {
+                totalSamples += (SAMPLE_RATE * (gapMs / 1000.0)).toInt()
+            }
+        }
+        if (totalSamples <= 0) return
+
+        val combinedBuffer = ShortArray(totalSamples)
+        var writePos = 0
+
+        for (i in frequencies.indices) {
+            val freq = frequencies[i]
+            val dur = durationsMs[i]
+            val toneBuffer = generateToneBuffer(freq, dur, volume, type)
+            System.arraycopy(toneBuffer, 0, combinedBuffer, writePos, toneBuffer.size)
+            writePos += toneBuffer.size
+
+            if (gapMs > 0) {
+                val silenceBuffer = generateSilenceBuffer(gapMs)
+                System.arraycopy(silenceBuffer, 0, combinedBuffer, writePos, silenceBuffer.size)
+                writePos += silenceBuffer.size
+            }
+        }
+
+        // Execute fast PCM write to persistent AudioTrack on single background thread
         audioScope.launch(sfxDispatcher) {
-            var track: AudioTrack? = null
             try {
-                val bufferSize = AudioTrack.getMinBufferSize(
-                    SAMPLE_RATE,
-                    AudioFormat.CHANNEL_OUT_MONO,
-                    AudioFormat.ENCODING_PCM_16BIT
-                ).coerceAtLeast(4096)
-
-                track = AudioTrack.Builder()
-                    .setAudioAttributes(
-                        AudioAttributes.Builder()
-                            .setUsage(AudioAttributes.USAGE_GAME)
-                            .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                            .build()
-                    )
-                    .setAudioFormat(
-                        AudioFormat.Builder()
-                            .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
-                            .setSampleRate(SAMPLE_RATE)
-                            .setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
-                            .build()
-                    )
-                    .setBufferSizeInBytes(bufferSize)
-                    .setTransferMode(AudioTrack.MODE_STREAM)
-                    .build()
-
-                track.play()
-
-                for (i in frequencies.indices) {
-                    if (!isActive || !isSoundEnabled) break
-                    val freq = frequencies[i]
-                    val dur = durationsMs[i]
-                    writeToneToTrack(track, freq, dur, volume, type)
-                    if (gapMs > 0) {
-                        delay(gapMs)
-                    }
-                }
+                val track = getSfxTrack() ?: return@launch
+                track.write(combinedBuffer, 0, combinedBuffer.size)
             } catch (e: Exception) {
-                Log.e(TAG, "SFX Error", e)
-            } finally {
-                try {
-                    track?.stop()
-                    track?.release()
-                } catch (e: Exception) { /* ignore */ }
+                Log.e(TAG, "Error playing SFX sequence", e)
             }
         }
     }
 
     fun playTokenMove() {
         // Crisp, clear wooden token pick-up sound
-        playSequence(listOf(750.0, 1050.0, 1350.0), listOf(20, 20, 25), volume = 0.40f, type = WaveType.SINE)
+        playSequence(listOf(800.0, 1150.0, 1450.0), listOf(18, 18, 22), volume = 0.40f, type = WaveType.SINE)
     }
 
     fun playTokenHop() {
-        // High-clarity wooden token step clack sound on the board ("Tuk" sound)
-        playSequence(listOf(1150.0, 1500.0), listOf(18, 22), volume = 0.45f, type = WaveType.SINE)
+        // High-clarity wooden token step clack sound on board ("Tuk" sound - crystal clear)
+        playSequence(listOf(1250.0, 1600.0), listOf(16, 20), volume = 0.48f, type = WaveType.SINE)
     }
 
     fun playTurnPass() {
         // Light double-blip
-        playSequence(listOf(523.3, 659.3), listOf(50, 70), volume = 0.25f, type = WaveType.SINE)
+        playSequence(listOf(523.3, 659.3), listOf(45, 65), volume = 0.28f, type = WaveType.SINE, gapMs = 15)
     }
 
     fun playAlert() {
         // Alarm-like dual sound
-        playSequence(listOf(880.0, 880.0, 880.0), listOf(80, 80, 80), volume = 0.30f, type = WaveType.SINE, gapMs = 40)
+        playSequence(listOf(880.0, 880.0, 880.0), listOf(75, 75, 75), volume = 0.32f, type = WaveType.SINE, gapMs = 30)
     }
 
     fun playDiceRoll() {
         // Soft, realistic wooden dice tumbling & rolling sound ("Goti/Pasa ki smooth awaj")
         playSequence(
-            listOf(220.0, 380.0, 260.0, 420.0, 310.0, 240.0, 350.0, 200.0, 180.0),
-            listOf(20, 22, 20, 22, 25, 25, 30, 35, 60),
-            volume = 0.35f,
-            type = WaveType.SINE
+            listOf(240.0, 400.0, 280.0, 440.0, 330.0, 250.0, 370.0, 220.0, 190.0),
+            listOf(18, 20, 18, 20, 22, 22, 25, 30, 50),
+            volume = 0.38f,
+            type = WaveType.SINE,
+            gapMs = 8
         )
     }
 
@@ -410,22 +449,23 @@ object LudoAudioEngine {
         // High impact capture/cut sound
         val freqs = mutableListOf<Double>()
         val durs = mutableListOf<Int>()
-        var f = 900.0
+        var f = 950.0
         while (f >= 220.0) {
             freqs.add(f)
-            durs.add(15)
-            f -= 80.0
+            durs.add(14)
+            f -= 85.0
         }
-        playSequence(freqs, durs, volume = 0.30f, type = WaveType.TRIANGLE)
+        playSequence(freqs, durs, volume = 0.35f, type = WaveType.TRIANGLE)
     }
 
     fun playVictory() {
-        // Fanfare
+        // Fanfare chord
         playSequence(
             listOf(261.6, 329.6, 392.0, 523.3, 659.3, 784.0, 1046.5),
-            listOf(70, 70, 70, 70, 70, 70, 400),
-            volume = 0.22f,
-            type = WaveType.SINE
+            listOf(60, 60, 60, 60, 60, 60, 350),
+            volume = 0.25f,
+            type = WaveType.SINE,
+            gapMs = 10
         )
     }
 
