@@ -1,4 +1,69 @@
-    - name: Create Valid Dummy Google Services JSON
+name: Build Android APK
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up JDK 17
+      uses: actions/setup-java@v4
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+
+    - name: Setup Android SDK
+      uses: android-actions/setup-android@v3
+
+    - name: Setup Gradle
+      uses: gradle/actions/setup-gradle@v4
+      with:
+        gradle-version: '8.11.1'
+
+    - name: Regenerate Clean Gradle Wrapper
       run: |
-        mkdir -p app
-        echo '{"project_info":{"project_number":"1234567890","project_id":"story-download-app","storage_bucket":"story-download-app.appspot.com"},"client":[{"client_info":{"mobilesdk_app_id":"1:1234567890:android:1234567890abcdef","android_client_info":{"package_name":"com.aistudio.ludo.prqymb"}},"oauth_client":[],"api_key":[{"current_key":"AIzaSyDummyKeyForBuildOnly12345"}],"services":{"analytics_service":{"status":1},"app_invite_service":{"status":1},"ads_service":{"status":1}}}],"configuration_version":"1"}' > app/google-services.json
+        gradle wrapper --gradle-version 8.11.1
+        chmod +x gradlew
+
+    - name: Setup Keystore
+      env:
+        RELEASE_KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
+      run: |
+        if [ -n "$RELEASE_KEYSTORE_BASE64" ]; then
+          echo "Decoding release keystore from GitHub secrets..."
+          echo "$RELEASE_KEYSTORE_BASE64" | base64 --decode > release-key.jks
+        fi
+        if [ -f "release-key.jks" ]; then
+          if ! keytool -list -keystore release-key.jks -storepass androidrelease >/dev/null 2>&1; then
+            echo "Removing corrupted release-key.jks..."
+            rm -f release-key.jks
+          fi
+        fi
+        if [ ! -f "release-key.jks" ]; then
+          echo "Generating clean release keystore..."
+          keytool -genkey -v -keystore release-key.jks -keyalg RSA -keysize 2048 -validity 10000 -alias releasekey -storepass androidrelease -keypass androidrelease -dname "CN=LudoRelease, OU=Mobile, O=AIStudio, L=City, ST=State, C=US"
+        fi
+
+    - name: Build Debug & Release APK
+      run: ./gradlew assembleDebug assembleRelease --stacktrace
+
+    - name: Upload Debug APK
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: app-debug-apk
+        path: app/build/outputs/apk/debug/*.apk
+
+    - name: Upload Release APK
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: app-release-apk
+        path: app/build/outputs/apk/release/*.apk
