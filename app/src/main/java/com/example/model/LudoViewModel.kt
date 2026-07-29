@@ -887,9 +887,9 @@ class LudoViewModel : ViewModel() {
                 val appId = try { com.example.BuildConfig.FIREBASE_APPLICATION_ID } catch (e: Exception) { "" }
 
                 val finalDbUrl = if (dbUrl.isNotBlank() && !dbUrl.contains("your_firebase_database_url")) dbUrl else "https://crown-ludo-2-default-rtdb.firebaseio.com"
-                val finalApiKey = if (apiKey.isNotBlank() && !apiKey.contains("your_firebase_api_key")) apiKey else "AIzaSyCt34364nKPbtn4dtpx6QcQrMpipknBHZw"
+                val finalApiKey = if (apiKey.isNotBlank() && !apiKey.contains("your_firebase_api_key")) apiKey else "AIzaSyB56yuiykT5BknDEWu9-eYjj-dsoezYZAc"
                 val finalProjectId = if (projectId.isNotBlank() && !projectId.contains("your_firebase_project_id")) projectId else "crown-ludo-2"
-                val finalAppId = if (appId.isNotBlank() && !appId.contains("your_firebase_application_id")) appId else "1:1050963446182:android:d8c003b84d920238442767"
+                val finalAppId = if (appId.isNotBlank() && !appId.contains("your_firebase_application_id")) appId else "1:1050963446182:android:c10f3955e1bd2bfa442767"
 
                 val options = com.google.firebase.FirebaseOptions.Builder()
                     .setDatabaseUrl(finalDbUrl)
