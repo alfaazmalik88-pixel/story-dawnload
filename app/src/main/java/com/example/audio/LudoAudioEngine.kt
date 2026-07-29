@@ -72,6 +72,20 @@ object LudoAudioEngine {
 
     var isSoundEnabled: Boolean = true
 
+    var isVoiceChatActive: Boolean = false
+        set(value) {
+            field = value
+            try {
+                if (value) {
+                    mediaPlayer?.setVolume(0.12f, 0.12f)
+                } else {
+                    mediaPlayer?.setVolume(0.6f, 0.6f)
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error adjusting BGM volume for voice chat: ${e.message}")
+            }
+        }
+
     var currentMusicMode: String = "GULF"
         set(value) {
             val changed = field != value
@@ -267,10 +281,11 @@ object LudoAudioEngine {
                         val melody = if (isGulf) gulfMelody else classicMelody
                         val note = melody[noteIndex % melody.size]
 
+                        val volFactor = if (isVoiceChatActive) 0.3f else 1.0f
                         val notePcm = if (isGulf) {
-                            generateOudToneBuffer(note.frequency, note.durationMs, volume = 0.28f)
+                            generateOudToneBuffer(note.frequency, note.durationMs, volume = 0.28f * volFactor)
                         } else {
-                            generateToneBuffer(note.frequency, note.durationMs, volume = 0.18f, type = WaveType.TRIANGLE)
+                            generateToneBuffer(note.frequency, note.durationMs, volume = 0.18f * volFactor, type = WaveType.TRIANGLE)
                         }
 
                         track.write(notePcm, 0, notePcm.size)

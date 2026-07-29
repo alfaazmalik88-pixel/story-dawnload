@@ -1227,6 +1227,7 @@ class LudoViewModel : ViewModel() {
                 statusMessage = "🎙️ Real-time Microphone ACTIVE! Speak into your phone."
             )
         }
+        LudoAudioEngine.isVoiceChatActive = true
     }
 
     fun disableMic() {
@@ -1240,6 +1241,7 @@ class LudoViewModel : ViewModel() {
                 statusMessage = "🎙️ Microphone Muted."
             )
         }
+        LudoAudioEngine.isVoiceChatActive = _uiState.value.isVoiceEnabled
     }
 
     fun toggleMic(context: android.content.Context? = null) {
@@ -1251,6 +1253,7 @@ class LudoViewModel : ViewModel() {
                 enableMic(appContext!!)
             } else {
                 _uiState.update { it.copy(isMicEnabled = true) }
+                LudoAudioEngine.isVoiceChatActive = true
             }
         } else {
             disableMic()
@@ -1261,6 +1264,7 @@ class LudoViewModel : ViewModel() {
         _uiState.update { 
             val nextVoice = !it.isVoiceEnabled
             sharedPrefs?.edit()?.putBoolean("is_voice_enabled", nextVoice)?.apply()
+            LudoAudioEngine.isVoiceChatActive = nextVoice || it.isMicEnabled
             if (nextVoice) {
                 RealtimeVoiceManager.speakAnnouncer("Voice speaker active", true)
                 it.copy(
