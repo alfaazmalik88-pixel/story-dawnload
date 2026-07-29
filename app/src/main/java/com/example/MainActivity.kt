@@ -24,20 +24,24 @@ import com.example.ui.LudoMatchmakingScreen
 import com.example.ui.LudoMenu
 import com.example.ui.LudoSplashScreen
 import com.example.ui.theme.MyApplicationTheme
-import com.startapp.sdk.adsbase.Ad
-import com.startapp.sdk.adsbase.StartAppAd
-import com.startapp.sdk.adsbase.StartAppSDK
-import com.startapp.sdk.adsbase.adlisteners.AdDisplayListener
-import com.startapp.sdk.adsbase.adlisteners.AdEventListener
-import com.startapp.sdk.adsbase.adlisteners.VideoListener
+import com.google.android.gms.ads.AdError
+import com.google.android.gms.ads.AdRequest
+import com.google.android.gms.ads.FullScreenContentCallback
+import com.google.android.gms.ads.LoadAdError
+import com.google.android.gms.ads.MobileAds
+import com.google.android.gms.ads.interstitial.InterstitialAd
+import com.google.android.gms.ads.interstitial.InterstitialAdLoadCallback
+import com.google.android.gms.ads.rewarded.RewardedAd
+import com.google.android.gms.ads.rewarded.RewardedAdLoadCallback
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
   private val viewModel: LudoViewModel by viewModels()
 
-  // Ad caching pool to instantly serve 4-5 preloaded Start.io ads
-  private val cachedStartIoAds = java.util.Collections.synchronizedList(mutableListOf<StartAppAd>())
+  // AdMob Test Ads
+  private var adMobInterstitialAd: InterstitialAd? = null
+  private var adMobRewardedAd: RewardedAd? = null
 
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
@@ -47,38 +51,37 @@ class MainActivity : ComponentActivity() {
     LudoAudioEngine.init(applicationContext)
     com.example.audio.RealtimeVoiceManager.init(applicationContext)
 
-    // Initialize Start.io Ads SDK with Original App ID 206275910
+    // Initialize Google AdMob SDK for Test Ads
     try {
-      StartAppSDK.init(this, "206275910", false)
-      StartAppSDK.enableReturnAds(false)
-      StartAppAd.disableSplash()
-      Log.d("StartIO", "Start.io SDK initialized with App ID 206275910")
-      preloadStartIoAds()
+      MobileAds.initialize(this) { initializationStatus ->
+        Log.d("AdMob", "Google AdMob SDK Initialized successfully: $initializationStatus")
+        preloadAdMobTestAds()
+      }
     } catch (e: Exception) {
-      Log.e("StartIO", "Error initializing Start.io SDK: ${e.message}")
+      Log.e("AdMob", "Error initializing Google AdMob SDK: ${e.message}")
     }
 
-    // Register Network Callback to automatically reload 4-5 ads as soon as internet turns ON
+    // Register Network Callback to automatically reload ads when internet reconnects
     try {
       val cm = getSystemService(android.content.Context.CONNECTIVITY_SERVICE) as? android.net.ConnectivityManager
       cm?.registerDefaultNetworkCallback(object : android.net.ConnectivityManager.NetworkCallback() {
         override fun onAvailable(network: android.net.Network) {
-          Log.d("StartIO", "📶 Network reconnected! Preloading 4-5 Start.io ads automatically.")
+          Log.d("AdEngine", "📶 Network reconnected! Preloading AdMob ads.")
           runOnUiThread {
-            preloadStartIoAds()
+            preloadAdMobTestAds()
           }
         }
       })
     } catch (e: Exception) {
-      Log.w("StartIO", "Could not register NetworkCallback: ${e.message}")
+      Log.w("AdEngine", "Could not register NetworkCallback: ${e.message}")
     }
 
-    // Collect uiState changes to dynamically show Start.io ads
+    // Collect uiState changes to dynamically show AdMob ads
     lifecycleScope.launch {
       viewModel.uiState.collectLatest { state ->
         val adType = state.adType
         if (adType != null && !state.isRealAdShowing) {
-          showStartIoAd(adType)
+          showAdMobAd(adType)
         }
       }
     }
@@ -135,7 +138,7 @@ class MainActivity : ComponentActivity() {
     super.onStart()
     LudoAudioEngine.startBgm(this)
     if (isNetworkConnected()) {
-      preloadStartIoAds()
+      preloadAdMobTestAds()
     }
   }
 
@@ -154,180 +157,165 @@ class MainActivity : ComponentActivity() {
     return false
   }
 
-  private var cachedInterstitialAd: StartAppAd? = null
-  private var cachedRewardedAd: StartAppAd? = null
-
-  private fun preloadStartIoAds() {
+  private fun preloadAdMobTestAds() {
     if (!isNetworkConnected()) return
-    Log.d("StartIO", "Preloading Start.io Interstitial and Rewarded Ads...")
-    
-    // Preload Interstitial
-    if (cachedInterstitialAd == null || cachedInterstitialAd?.isReady == false) {
-      val interstitial = StartAppAd(this@MainActivity)
-      interstitial.loadAd(StartAppAd.AdMode.AUTOMATIC, object : AdEventListener {
-        override fun onReceiveAd(a: Ad) {
-          Log.d("StartIO", "Preloaded Interstitial Ad successfully")
-          cachedInterstitialAd = interstitial
+    Log.d("AdMob", "Preloading AdMob Test Interstitial & Rewarded Ads...")
+
+    // AdMob Test Interstitial
+    if (adMobInterstitialAd == null) {
+      val adRequest = AdRequest.Builder().build()
+      InterstitialAd.load(
+        this,
+        "ca-app-pub-3940256099942544/1033173712", // Google Official Test Interstitial Unit ID
+        adRequest,
+        object : InterstitialAdLoadCallback() {
+          override fun onAdLoaded(ad: InterstitialAd) {
+            Log.d("AdMob", "AdMob Test Interstitial Ad Loaded Successfully!")
+            adMobInterstitialAd = ad
+          }
+
+          override fun onAdFailedToLoad(error: LoadAdError) {
+            Log.w("AdMob", "Failed to load AdMob Test Interstitial: ${error.message}")
+            adMobInterstitialAd = null
+          }
         }
-        override fun onFailedToReceiveAd(a: Ad?) {
-          Log.w("StartIO", "Failed to preload Interstitial Ad: ${a?.errorMessage}")
-        }
-      })
+      )
     }
 
-    // Preload Rewarded Video
-    if (cachedRewardedAd == null || cachedRewardedAd?.isReady == false) {
-      val rewarded = StartAppAd(this@MainActivity)
-      rewarded.loadAd(StartAppAd.AdMode.REWARDED_VIDEO, object : AdEventListener {
-        override fun onReceiveAd(a: Ad) {
-          Log.d("StartIO", "Preloaded Rewarded Video Ad successfully")
-          cachedRewardedAd = rewarded
+    // AdMob Test Rewarded
+    if (adMobRewardedAd == null) {
+      val adRequest = AdRequest.Builder().build()
+      RewardedAd.load(
+        this,
+        "ca-app-pub-3940256099942544/5224354917", // Google Official Test Rewarded Unit ID
+        adRequest,
+        object : RewardedAdLoadCallback() {
+          override fun onAdLoaded(ad: RewardedAd) {
+            Log.d("AdMob", "AdMob Test Rewarded Ad Loaded Successfully!")
+            adMobRewardedAd = ad
+          }
+
+          override fun onAdFailedToLoad(error: LoadAdError) {
+            Log.w("AdMob", "Failed to load AdMob Test Rewarded: ${error.message}")
+            adMobRewardedAd = null
+          }
         }
-        override fun onFailedToReceiveAd(a: Ad?) {
-          Log.w("StartIO", "Failed to preload Rewarded Video Ad: ${a?.errorMessage}")
-        }
-      })
+      )
     }
   }
 
-  private fun showStartIoAd(adType: AdType) {
+  private fun showAdMobAd(adType: AdType) {
     val isRewarded = (adType == AdType.GUARANTEED_SIX || adType == AdType.EXTEND_TIME || adType == AdType.WATCH_AD)
 
     if (!isNetworkConnected()) {
       if (isRewarded) {
-        viewModel.onAdFailedOrOffline("❌ Internet Connection Required! Turn on mobile data or Wi-Fi to load video ads.")
+        viewModel.onAdFailedOrOffline("❌ Internet Connection Required! Turn on mobile data or Wi-Fi to load test ads.")
       } else {
         viewModel.onRealAdCompleted(adType)
       }
       return
     }
 
-    // Mark real ad as started immediately so ViewModel fallback timer doesn't cancel it prematurely
     viewModel.onRealAdStarted()
 
     if (isRewarded) {
-      val readyAd = cachedRewardedAd
-      if (readyAd != null && readyAd.isReady) {
-        Log.d("StartIO", "Displaying preloaded Rewarded Video Ad!")
-        cachedRewardedAd = null
-        readyAd.showAd(object : AdDisplayListener {
-          override fun adDisplayed(ad: Ad) {
-            Log.d("StartIO", "Start.io Rewarded Ad displayed successfully")
-          }
-          override fun adHidden(ad: Ad) {
-            Log.d("StartIO", "Start.io Rewarded Ad closed")
+      val readyAdMob = adMobRewardedAd
+      if (readyAdMob != null) {
+        Log.d("AdMob", "Displaying AdMob Test Rewarded Ad!")
+        adMobRewardedAd = null
+        readyAdMob.fullScreenContentCallback = object : FullScreenContentCallback() {
+          override fun onAdDismissedFullScreenContent() {
+            Log.d("AdMob", "AdMob Test Rewarded Ad closed")
             viewModel.onRealAdCompleted(adType)
-            preloadStartIoAds()
+            preloadAdMobTestAds()
           }
-          override fun adClicked(ad: Ad) {}
-          override fun adNotDisplayed(ad: Ad) {
-            Log.w("StartIO", "Start.io Rewarded Ad failed to display")
+          override fun onAdFailedToShowFullScreenContent(error: AdError) {
+            Log.w("AdMob", "AdMob Test Rewarded Ad failed to show: ${error.message}")
             viewModel.onRealAdCompleted(adType)
-            preloadStartIoAds()
+            preloadAdMobTestAds()
           }
-        })
+        }
+        readyAdMob.show(this) { rewardItem ->
+          Log.d("AdMob", "User awarded: ${rewardItem.amount} ${rewardItem.type}")
+        }
       } else {
-        Log.d("StartIO", "Loading fresh Rewarded Video Ad on demand...")
-        val freshAd = StartAppAd(this@MainActivity)
-        freshAd.loadAd(StartAppAd.AdMode.REWARDED_VIDEO, object : AdEventListener {
-          override fun onReceiveAd(ad: Ad) {
-            freshAd.showAd(object : AdDisplayListener {
-              override fun adDisplayed(ad: Ad) {
-                Log.d("StartIO", "Fresh Rewarded Ad displayed")
+        Log.d("AdMob", "AdMob Rewarded ad not ready yet, loading on demand...")
+        val adRequest = AdRequest.Builder().build()
+        RewardedAd.load(
+          this,
+          "ca-app-pub-3940256099942544/5224354917",
+          adRequest,
+          object : RewardedAdLoadCallback() {
+            override fun onAdLoaded(ad: RewardedAd) {
+              ad.fullScreenContentCallback = object : FullScreenContentCallback() {
+                override fun onAdDismissedFullScreenContent() {
+                  viewModel.onRealAdCompleted(adType)
+                  preloadAdMobTestAds()
+                }
+                override fun onAdFailedToShowFullScreenContent(error: AdError) {
+                  viewModel.onRealAdCompleted(adType)
+                  preloadAdMobTestAds()
+                }
               }
-              override fun adHidden(ad: Ad) {
-                Log.d("StartIO", "Fresh Rewarded Ad closed")
-                viewModel.onRealAdCompleted(adType)
-                preloadStartIoAds()
+              ad.show(this@MainActivity) { rewardItem ->
+                Log.d("AdMob", "Rewarded item: ${rewardItem.amount}")
               }
-              override fun adClicked(ad: Ad) {}
-              override fun adNotDisplayed(ad: Ad) {
-                Log.w("StartIO", "Fresh Rewarded Ad not displayed")
-                viewModel.onRealAdCompleted(adType)
-                preloadStartIoAds()
-              }
-            })
-          }
+            }
 
-          override fun onFailedToReceiveAd(ad: Ad?) {
-            Log.e("StartIO", "Failed to receive Rewarded Ad: ${ad?.errorMessage}. Trying Automatic fallback...")
-            val backupAd = StartAppAd(this@MainActivity)
-            backupAd.loadAd(StartAppAd.AdMode.AUTOMATIC, object : AdEventListener {
-              override fun onReceiveAd(a: Ad) {
-                backupAd.showAd(object : AdDisplayListener {
-                  override fun adDisplayed(a: Ad) {}
-                  override fun adHidden(a: Ad) {
-                    viewModel.onRealAdCompleted(adType)
-                    preloadStartIoAds()
-                  }
-                  override fun adClicked(a: Ad) {}
-                  override fun adNotDisplayed(a: Ad) {
-                    viewModel.onRealAdCompleted(adType)
-                  }
-                })
-              }
-
-              override fun onFailedToReceiveAd(a: Ad?) {
-                Log.w("StartIO", "Backup Ad also failed to receive")
-                viewModel.onRealAdCompleted(adType)
-              }
-            })
+            override fun onAdFailedToLoad(error: LoadAdError) {
+              Log.e("AdMob", "Failed to load on-demand rewarded ad: ${error.message}")
+              viewModel.onRealAdCompleted(adType)
+            }
           }
-        })
+        )
       }
     } else {
-      // Interstitial / Fullscreen ad
-      val readyAd = cachedInterstitialAd
-      if (readyAd != null && readyAd.isReady) {
-        Log.d("StartIO", "Displaying preloaded Interstitial Ad!")
-        cachedInterstitialAd = null
-        readyAd.showAd(object : AdDisplayListener {
-          override fun adDisplayed(ad: Ad) {
-            Log.d("StartIO", "Start.io Interstitial displayed")
-          }
-          override fun adHidden(ad: Ad) {
-            Log.d("StartIO", "Start.io Interstitial closed")
+      val readyAdMob = adMobInterstitialAd
+      if (readyAdMob != null) {
+        Log.d("AdMob", "Displaying AdMob Test Interstitial Ad!")
+        adMobInterstitialAd = null
+        readyAdMob.fullScreenContentCallback = object : FullScreenContentCallback() {
+          override fun onAdDismissedFullScreenContent() {
+            Log.d("AdMob", "AdMob Test Interstitial Ad closed")
             viewModel.onRealAdCompleted(adType)
-            preloadStartIoAds()
+            preloadAdMobTestAds()
           }
-          override fun adClicked(ad: Ad) {}
-          override fun adNotDisplayed(ad: Ad) {
-            Log.w("StartIO", "Start.io Interstitial not displayed")
+          override fun onAdFailedToShowFullScreenContent(error: AdError) {
+            Log.w("AdMob", "AdMob Test Interstitial Ad failed to show: ${error.message}")
             viewModel.onRealAdCompleted(adType)
-            preloadStartIoAds()
+            preloadAdMobTestAds()
           }
-        })
+        }
+        readyAdMob.show(this)
       } else {
-        Log.d("StartIO", "Loading fresh Interstitial Ad on demand...")
-        val freshAd = StartAppAd(this@MainActivity)
-        freshAd.loadAd(StartAppAd.AdMode.AUTOMATIC, object : AdEventListener {
-          override fun onReceiveAd(ad: Ad) {
-            freshAd.showAd(object : AdDisplayListener {
-              override fun adDisplayed(ad: Ad) {
-                Log.d("StartIO", "Fresh Interstitial displayed")
+        Log.d("AdMob", "AdMob Interstitial ad not ready yet, loading on demand...")
+        val adRequest = AdRequest.Builder().build()
+        InterstitialAd.load(
+          this,
+          "ca-app-pub-3940256099942544/1033173712",
+          adRequest,
+          object : InterstitialAdLoadCallback() {
+            override fun onAdLoaded(ad: InterstitialAd) {
+              ad.fullScreenContentCallback = object : FullScreenContentCallback() {
+                override fun onAdDismissedFullScreenContent() {
+                  viewModel.onRealAdCompleted(adType)
+                  preloadAdMobTestAds()
+                }
+                override fun onAdFailedToShowFullScreenContent(error: AdError) {
+                  viewModel.onRealAdCompleted(adType)
+                  preloadAdMobTestAds()
+                }
               }
-              override fun adHidden(ad: Ad) {
-                Log.d("StartIO", "Fresh Interstitial closed")
-                viewModel.onRealAdCompleted(adType)
-                preloadStartIoAds()
-              }
-              override fun adClicked(ad: Ad) {}
-              override fun adNotDisplayed(ad: Ad) {
-                Log.w("StartIO", "Fresh Interstitial not displayed")
-                viewModel.onRealAdCompleted(adType)
-                preloadStartIoAds()
-              }
-            })
-          }
+              ad.show(this@MainActivity)
+            }
 
-          override fun onFailedToReceiveAd(ad: Ad?) {
-            Log.e("StartIO", "Failed to receive Interstitial Ad: ${ad?.errorMessage}")
-            viewModel.onRealAdCompleted(adType)
+            override fun onAdFailedToLoad(error: LoadAdError) {
+              Log.e("AdMob", "Failed to load on-demand interstitial ad: ${error.message}")
+              viewModel.onRealAdCompleted(adType)
+            }
           }
-        })
+        )
       }
     }
   }
 }
-
-

@@ -80,6 +80,7 @@ fun LudoMenu(
     var noInternetNoticeMode by remember { mutableStateOf<LudoGameMode?>(null) }
     var showRenameDialog by remember { mutableStateOf(false) }
     var showShopDialog by remember { mutableStateOf(false) }
+    var showOnlineComingSoonDialog by remember { mutableStateOf(false) }
     var newNameInput by remember { mutableStateOf("") }
     val context = androidx.compose.ui.platform.LocalContext.current
 
@@ -1257,12 +1258,7 @@ fun LudoMenu(
                             liveUsersCount = uiState.liveOnlineUsersCount,
                             isHindi = uiState.selectedLanguage.code.contains("hi"),
                             onClick = {
-                                if (isInternetAvailable(context)) {
-                                    viewModel.selectGameMode(LudoGameMode.HYBRID_ONLINE)
-                                } else {
-                                    noInternetNoticeMode = LudoGameMode.HYBRID_ONLINE
-                                    showNoInternetDialog = true
-                                }
+                                showOnlineComingSoonDialog = true
                             },
                             modifier = Modifier.fillMaxWidth()
                         )
@@ -1568,7 +1564,9 @@ fun LudoMenu(
                     Button(
                         onClick = {
                             val currentMode = uiState.gameMode
-                            if ((currentMode == LudoGameMode.HYBRID_ONLINE || currentMode == LudoGameMode.ONE_VS_ONE) && !isInternetAvailable(context)) {
+                            if (currentMode == LudoGameMode.HYBRID_ONLINE) {
+                                showOnlineComingSoonDialog = true
+                            } else if (currentMode == LudoGameMode.ONE_VS_ONE && !isInternetAvailable(context)) {
                                 noInternetNoticeMode = currentMode
                                 showNoInternetDialog = true
                             } else {
@@ -1601,8 +1599,6 @@ fun LudoMenu(
             }
 
             Spacer(modifier = Modifier.height(12.dp))
-
-            Spacer(modifier = Modifier.height(24.dp))
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.Center,
@@ -1619,6 +1615,57 @@ fun LudoMenu(
             }
 
             Spacer(modifier = Modifier.height(40.dp))
+        }
+
+        // Online Coming Soon Dialog
+        if (showOnlineComingSoonDialog) {
+            AlertDialog(
+                onDismissRequest = { showOnlineComingSoonDialog = false },
+                title = {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text("⏳", fontSize = 22.sp)
+                        Text(
+                            text = if (uiState.selectedLanguage.code.contains("hi")) "ऑनलाइन गेम - जल्द आ रहा है!" else "Online Game - Coming Soon!",
+                            style = MaterialTheme.typography.titleMedium.copy(
+                                fontWeight = FontWeight.Black,
+                                color = Color(0xFFFFD700)
+                            )
+                        )
+                    }
+                },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Text(
+                            text = if (uiState.selectedLanguage.code.contains("hi"))
+                                "ऑनलाइन मल्टीप्लेयर मोड पर सर्वर अपग्रेड का काम चल रहा है। जल्द ही लाइव वॉइस चैट और ग्लोबल मैचमेकिंग उपलब्ध होगी!\n\nतब तक क्लासिक, 1v1 या कंप्यूटर मोड का मज़ा लें! 🎲"
+                            else
+                                "Online Multiplayer mode is currently undergoing server upgrades for ultra-low latency & live voice chat.\n\nPlease enjoy Classic, 1v1, or Vs Computer mode in the meantime! 🎲",
+                            style = MaterialTheme.typography.bodyMedium.copy(
+                                color = Color.White.copy(alpha = 0.9f),
+                                fontSize = 14.sp
+                            )
+                        )
+                    }
+                },
+                confirmButton = {
+                    Button(
+                        onClick = { showOnlineComingSoonDialog = false },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFFD700)),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Text(
+                            text = if (uiState.selectedLanguage.code.contains("hi")) "ठीक है (OK)" else "OK, Got It",
+                            color = Color.Black,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                },
+                containerColor = Color(0xFF1E1B4B),
+                shape = RoundedCornerShape(20.dp)
+            )
         }
 
         // Rules Guide Dialog
@@ -2075,36 +2122,18 @@ fun GameModeCard(
                     maxLines = 1
                 )
                 if (isOnline) {
-                    val infiniteTransitionLobby = rememberInfiniteTransition(label = "lobby_pulse")
-                    val livePulseAlpha by infiniteTransitionLobby.animateFloat(
-                        initialValue = 0.3f,
-                        targetValue = 1f,
-                        animationSpec = infiniteRepeatable(
-                            animation = tween(800, easing = LinearEasing),
-                            repeatMode = RepeatMode.Reverse
-                        ),
-                        label = "livePulse"
-                    )
                     Spacer(modifier = Modifier.height(3.dp))
                     Row(
                         horizontalArrangement = Arrangement.Center,
-                        verticalAlignment = Alignment.CenterVertically
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(Color(0xFFDC2626))
+                            .padding(horizontal = 8.dp, vertical = 2.dp)
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .size(6.dp)
-                                .clip(androidx.compose.foundation.shape.CircleShape)
-                                .background(Color(0xFF10B981).copy(alpha = livePulseAlpha))
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        val countText = if (isHindi) {
-                            "$liveUsersCount ऑनलाइन खिलाड़ी 🟢"
-                        } else {
-                            "$liveUsersCount PLAYERS ONLINE 🟢"
-                        }
                         Text(
-                            text = countText,
-                            color = Color(0xFF047857),
+                            text = if (isHindi) "⏳ जल्द आ रहा है (COMING SOON)" else "⏳ COMING SOON",
+                            color = Color.White,
                             fontSize = 9.sp,
                             fontWeight = FontWeight.Black,
                             letterSpacing = 0.5.sp

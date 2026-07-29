@@ -20,6 +20,11 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import com.google.android.gms.ads.AdListener
+import com.google.android.gms.ads.AdRequest
+import com.google.android.gms.ads.AdSize
+import com.google.android.gms.ads.AdView
+import com.google.android.gms.ads.LoadAdError
 import kotlinx.coroutines.delay
 
 interface AdItem {
@@ -42,7 +47,7 @@ data class BannerAdData(
 
 @Composable
 fun BannerAd(modifier: Modifier = Modifier) {
-    var adMode by remember { mutableStateOf(0) } // 0: Start.io, 1: Backup
+    var adMode by remember { mutableStateOf(0) } // 0: AdMob, 1: Backup
 
     Box(
         modifier = modifier
@@ -54,32 +59,26 @@ fun BannerAd(modifier: Modifier = Modifier) {
     ) {
         when (adMode) {
             0 -> {
-                // Start.io Banner Ad
+                // Google AdMob Test Banner Ad
                 AndroidView(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(50.dp),
                     factory = { context ->
-                        try {
-                            com.startapp.sdk.ads.banner.Banner(context).apply {
-                                setBannerListener(object : com.startapp.sdk.ads.banner.BannerListener {
-                                    override fun onReceiveAd(view: android.view.View?) {
-                                        Log.d("StartIO", "Start.io Banner loaded successfully.")
-                                    }
+                        AdView(context).apply {
+                            setAdSize(AdSize.BANNER)
+                            adUnitId = "ca-app-pub-3940256099942544/6300978111" // Google Official Test Banner ID
+                            adListener = object : AdListener() {
+                                override fun onAdLoaded() {
+                                    Log.d("AdMob", "AdMob Banner loaded successfully.")
+                                }
 
-                                    override fun onFailedToReceiveAd(view: android.view.View?) {
-                                        Log.e("StartIO", "Start.io Banner failed, switching to backup.")
-                                        adMode = 1
-                                    }
-
-                                    override fun onClick(view: android.view.View?) {}
-                                    override fun onImpression(view: android.view.View?) {}
-                                })
+                                override fun onAdFailedToLoad(error: LoadAdError) {
+                                    Log.e("AdMob", "AdMob Banner failed: ${error.message}, switching to backup.")
+                                    adMode = 1
+                                }
                             }
-                        } catch (e: Exception) {
-                            Log.e("StartIO", "Exception creating Start.io Banner: ${e.message}")
-                            adMode = 1
-                            android.view.View(context)
+                            loadAd(AdRequest.Builder().build())
                         }
                     }
                 )
@@ -149,7 +148,7 @@ fun BackupSimulatedBannerAd() {
             .height(50.dp)
             .shadow(4.dp, RoundedCornerShape(0.dp)),
         shape = RoundedCornerShape(0.dp),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B)) // Slate dark banner container
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B))
     ) {
         Box(
             modifier = Modifier
@@ -172,12 +171,10 @@ fun BackupSimulatedBannerAd() {
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                // Left Part: AD Tag, Icon, Title and Description
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.weight(1f)
                 ) {
-                    // Small AD badge
                     Box(
                         modifier = Modifier
                             .clip(RoundedCornerShape(3.dp))
@@ -195,7 +192,6 @@ fun BackupSimulatedBannerAd() {
 
                     Spacer(modifier = Modifier.width(8.dp))
 
-                    // Animated Icon
                     AnimatedContent(
                         targetState = currentAd.icon,
                         transitionSpec = {
@@ -217,7 +213,6 @@ fun BackupSimulatedBannerAd() {
 
                     Spacer(modifier = Modifier.width(8.dp))
 
-                    // Ad text details (Title & Subtitle)
                     Column(
                         modifier = Modifier.fillMaxHeight(),
                         verticalArrangement = Arrangement.Center
@@ -259,7 +254,6 @@ fun BackupSimulatedBannerAd() {
 
                 Spacer(modifier = Modifier.width(8.dp))
 
-                // Right Part: Install / Play Button
                 Box(
                     modifier = Modifier
                         .clip(RoundedCornerShape(14.dp))

@@ -28,8 +28,36 @@ object LudoAudioEngine {
     private var bgmJob: Job? = null
     private var appContext: Context? = null
 
+    // Pre-computed instant SFX buffers (zero calculation delay, zero latency)
+    private val tokenHopPcm: ShortArray by lazy { generateTokenHopPcm() }
+    private val tokenMovePcm: ShortArray by lazy {
+        generateSequenceBuffer(listOf(987.77, 1318.51), listOf(25, 35), volume = 0.40f, type = WaveType.SINE, gapMs = 5)
+    }
+    private val diceRollPcm: ShortArray by lazy {
+        generateSequenceBuffer(listOf(360.0, 520.0, 410.0, 580.0, 320.0), listOf(14, 16, 18, 20, 28), volume = 0.42f, type = WaveType.SINE, gapMs = 8)
+    }
+    private val turnPassPcm: ShortArray by lazy {
+        generateSequenceBuffer(listOf(523.25, 659.25), listOf(40, 50), volume = 0.30f, type = WaveType.SINE, gapMs = 10)
+    }
+    private val alertPcm: ShortArray by lazy {
+        generateSequenceBuffer(listOf(880.0, 880.0, 880.0), listOf(60, 60, 60), volume = 0.32f, type = WaveType.SINE, gapMs = 25)
+    }
+    private val tokenCapturedPcm: ShortArray by lazy {
+        generateSequenceBuffer(listOf(880.0, 740.0, 587.33, 440.0, 293.66), listOf(20, 20, 20, 25, 40), volume = 0.40f, type = WaveType.SINE, gapMs = 5)
+    }
+    private val victoryPcm: ShortArray by lazy {
+        generateSequenceBuffer(listOf(261.63, 329.63, 392.00, 523.25, 659.25, 783.99, 1046.50), listOf(55, 55, 55, 55, 55, 55, 320), volume = 0.32f, type = WaveType.SINE, gapMs = 8)
+    }
+
     fun init(context: Context) {
         appContext = context.applicationContext
+        // Warm up SFX track and preload PCM buffers at start
+        audioScope.launch(sfxDispatcher) {
+            getSfxTrack()
+            tokenHopPcm
+            tokenMovePcm
+            diceRollPcm
+        }
     }
 
     var isMusicEnabled: Boolean = true
@@ -59,11 +87,12 @@ object LudoAudioEngine {
         if (!isSoundEnabled) return null
         if (sfxTrack == null) {
             try {
+                // Minimum buffer size for lowest hardware latency (~20ms)
                 val minBuff = AudioTrack.getMinBufferSize(
                     SAMPLE_RATE,
                     AudioFormat.CHANNEL_OUT_MONO,
                     AudioFormat.ENCODING_PCM_16BIT
-                ).coerceAtLeast(16384)
+                ).coerceAtLeast(2048)
 
                 val track = AudioTrack.Builder()
                     .setAudioAttributes(
@@ -209,7 +238,7 @@ object LudoAudioEngine {
                         SAMPLE_RATE,
                         AudioFormat.CHANNEL_OUT_MONO,
                         AudioFormat.ENCODING_PCM_16BIT
-                    ).coerceAtLeast(32768)
+                    ).coerceAtLeast(16384)
 
                     val track = AudioTrack.Builder()
                         .setAudioAttributes(
@@ -244,7 +273,6 @@ object LudoAudioEngine {
                             generateToneBuffer(note.frequency, note.durationMs, volume = 0.18f, type = WaveType.TRIANGLE)
                         }
 
-                        // Seamlessly write note PCM + small gap silence directly to AudioTrack (no coroutine delays)
                         track.write(notePcm, 0, notePcm.size)
 
                         val gapMs = if (isGulf) 25 else 45
@@ -289,6 +317,10 @@ object LudoAudioEngine {
         }
     }
 
+    /**
+     * Ultra-smooth tone buffer generator with Hanning/raised-cosine windowing.
+     * Prevents any clicking, popping, or harmonic distortion.
+     */
     private fun generateToneBuffer(
         frequency: Double,
         durationMs: Int,
@@ -299,15 +331,15 @@ object LudoAudioEngine {
         if (numSamples <= 0) return ShortArray(0)
         val samples = ShortArray(numSamples)
 
-        val attackSamples = (SAMPLE_RATE * 0.003).toInt().coerceAtLeast(1) // 3ms smooth attack
-        val releaseSamples = (SAMPLE_RATE * 0.006).toInt().coerceAtLeast(1) // 6ms smooth release
+        val attackSamples = (SAMPLE_RATE * 0.005).toInt().coerceIn(1, numSamples)
+        val releaseSamples = (SAMPLE_RATE * 0.010).toInt().coerceIn(1, numSamples)
 
         for (i in 0 until numSamples) {
             val t = i.toDouble() / SAMPLE_RATE
             val angle = 2.0 * Math.PI * frequency * t
             val waveVal = when (type) {
                 WaveType.SINE -> Math.sin(angle)
-                WaveType.SQUARE -> if (Math.sin(angle) >= 0) 1.0 else -1.0
+                WaveType.SQUARE -> if (Math.sin(angle) >= 0) 0.8 else -0.8
                 WaveType.TRIANGLE -> {
                     val x = angle / (2.0 * Math.PI)
                     2.0 * Math.abs(2.0 * (x - Math.floor(x + 0.5))) - 1.0
@@ -315,13 +347,13 @@ object LudoAudioEngine {
             }
 
             val env = when {
-                i < attackSamples -> (i.toFloat() / attackSamples)
-                i >= numSamples - releaseSamples -> ((numSamples - 1 - i).toFloat() / releaseSamples).coerceIn(0f, 1f)
-                else -> 1.0f
+                i < attackSamples -> 0.5 * (1.0 - Math.cos(Math.PI * i / attackSamples))
+                i >= numSamples - releaseSamples -> 0.5 * (1.0 + Math.cos(Math.PI * (i - (numSamples - releaseSamples)) / releaseSamples))
+                else -> 1.0
             }
 
-            samples[i] = (waveVal * 32767.0 * volume * env).toInt()
-                .coerceIn(Short.MIN_VALUE.toInt(), Short.MAX_VALUE.toInt()).toShort()
+            val sampleVal = (waveVal * 32767.0 * volume * env).toInt()
+            samples[i] = sampleVal.coerceIn(Short.MIN_VALUE.toInt(), Short.MAX_VALUE.toInt()).toShort()
         }
         return samples
     }
@@ -349,14 +381,14 @@ object LudoAudioEngine {
             val waveVal = (fundamental + oct1 + oct2 + oct3) / 1.75
 
             val env = if (i < attackSamples) {
-                (i.toFloat() / attackSamples)
+                0.5 * (1.0 - Math.cos(Math.PI * i / attackSamples))
             } else {
                 val progress = (i - attackSamples).toDouble() / (numSamples - attackSamples)
-                Math.exp(-2.6 * progress).toFloat()
+                Math.exp(-2.6 * progress)
             }
 
-            samples[i] = (waveVal * 32767.0 * volume * env).toInt()
-                .coerceIn(Short.MIN_VALUE.toInt(), Short.MAX_VALUE.toInt()).toShort()
+            val sampleVal = (waveVal * 32767.0 * volume * env).toInt()
+            samples[i] = sampleVal.coerceIn(Short.MIN_VALUE.toInt(), Short.MAX_VALUE.toInt()).toShort()
         }
         return samples
     }
@@ -367,16 +399,47 @@ object LudoAudioEngine {
         return ShortArray(numSamples)
     }
 
-    private fun playSequence(
+    /**
+     * Generates a physical wooden token landing sound ("Tuk" / "Clack") with zero phase noise / distortion.
+     * Uses phase accumulation to eliminate any harmonic frequency jumps or buzzing ("banbanat").
+     */
+    private fun generateTokenHopPcm(): ShortArray {
+        val durationMs = 28
+        val numSamples = (SAMPLE_RATE * (durationMs / 1000.0)).toInt()
+        val buffer = ShortArray(numSamples)
+
+        val startFreq = 1350.0
+        val endFreq = 480.0
+        val volume = 0.50f
+        val attackSamples = (SAMPLE_RATE * 0.002).toInt().coerceAtLeast(1)
+
+        var phase = 0.0
+        for (i in 0 until numSamples) {
+            val progress = i.toDouble() / numSamples
+            val currentFreq = startFreq * Math.pow(endFreq / startFreq, progress)
+            phase += 2.0 * Math.PI * currentFreq / SAMPLE_RATE
+
+            // Pure sine fundamental + soft body resonance (zero phase jump noise)
+            val fundamental = Math.sin(phase)
+            val bodyResonance = 0.20 * Math.sin(phase * 2.0)
+            val rawWave = (fundamental + bodyResonance) / 1.20
+
+            val attack = if (i < attackSamples) (i.toDouble() / attackSamples) else 1.0
+            val env = attack * Math.exp(-7.0 * progress)
+
+            val sampleVal = (rawWave * 32767.0 * volume * env).toInt()
+            buffer[i] = sampleVal.coerceIn(Short.MIN_VALUE.toInt(), Short.MAX_VALUE.toInt()).toShort()
+        }
+        return buffer
+    }
+
+    private fun generateSequenceBuffer(
         frequencies: List<Double>,
         durationsMs: List<Int>,
         volume: Float = 0.35f,
         type: WaveType = WaveType.SINE,
         gapMs: Int = 0
-    ) {
-        if (!isSoundEnabled) return
-
-        // Compute total combined PCM buffer length
+    ): ShortArray {
         var totalSamples = 0
         for (dur in durationsMs) {
             totalSamples += (SAMPLE_RATE * (dur / 1000.0)).toInt()
@@ -384,7 +447,7 @@ object LudoAudioEngine {
                 totalSamples += (SAMPLE_RATE * (gapMs / 1000.0)).toInt()
             }
         }
-        if (totalSamples <= 0) return
+        if (totalSamples <= 0) return ShortArray(0)
 
         val combinedBuffer = ShortArray(totalSamples)
         var writePos = 0
@@ -402,71 +465,57 @@ object LudoAudioEngine {
                 writePos += silenceBuffer.size
             }
         }
+        return combinedBuffer
+    }
 
-        // Execute fast PCM write to persistent AudioTrack on single background thread
+    private fun playPrecalculatedPcm(buffer: ShortArray) {
+        if (!isSoundEnabled || buffer.isEmpty()) return
         audioScope.launch(sfxDispatcher) {
             try {
                 val track = getSfxTrack() ?: return@launch
-                track.write(combinedBuffer, 0, combinedBuffer.size)
+                track.write(buffer, 0, buffer.size, AudioTrack.WRITE_NON_BLOCKING)
             } catch (e: Exception) {
-                Log.e(TAG, "Error playing SFX sequence", e)
+                Log.e(TAG, "Error playing precalculated SFX", e)
             }
         }
     }
 
+    /**
+     * Crystal clear, organic wooden token pick-up sound ("Tink"). Instant playback.
+     */
     fun playTokenMove() {
-        // Crisp, clear wooden token pick-up sound
-        playSequence(listOf(800.0, 1150.0, 1450.0), listOf(18, 18, 22), volume = 0.40f, type = WaveType.SINE)
+        playPrecalculatedPcm(tokenMovePcm)
     }
 
+    /**
+     * Instant, zero-delay physical wooden token board hop sound ("Tuk" / "Clack").
+     * Crystal clear, pure acoustic wood clack with 0ms calculation delay and zero buzzing ("banbanat").
+     */
     fun playTokenHop() {
-        // High-clarity wooden token step clack sound on board ("Tuk" sound - crystal clear)
-        playSequence(listOf(1250.0, 1600.0), listOf(16, 20), volume = 0.48f, type = WaveType.SINE)
+        playPrecalculatedPcm(tokenHopPcm)
     }
 
     fun playTurnPass() {
-        // Light double-blip
-        playSequence(listOf(523.3, 659.3), listOf(45, 65), volume = 0.28f, type = WaveType.SINE, gapMs = 15)
+        playPrecalculatedPcm(turnPassPcm)
     }
 
     fun playAlert() {
-        // Alarm-like dual sound
-        playSequence(listOf(880.0, 880.0, 880.0), listOf(75, 75, 75), volume = 0.32f, type = WaveType.SINE, gapMs = 30)
+        playPrecalculatedPcm(alertPcm)
     }
 
+    /**
+     * Smooth, realistic wooden dice rolling & tumbling sound ("Pasa ki crystal clear awaj").
+     */
     fun playDiceRoll() {
-        // Soft, realistic wooden dice tumbling & rolling sound ("Goti/Pasa ki smooth awaj")
-        playSequence(
-            listOf(240.0, 400.0, 280.0, 440.0, 330.0, 250.0, 370.0, 220.0, 190.0),
-            listOf(18, 20, 18, 20, 22, 22, 25, 30, 50),
-            volume = 0.38f,
-            type = WaveType.SINE,
-            gapMs = 8
-        )
+        playPrecalculatedPcm(diceRollPcm)
     }
 
     fun playTokenCaptured() {
-        // High impact capture/cut sound
-        val freqs = mutableListOf<Double>()
-        val durs = mutableListOf<Int>()
-        var f = 950.0
-        while (f >= 220.0) {
-            freqs.add(f)
-            durs.add(14)
-            f -= 85.0
-        }
-        playSequence(freqs, durs, volume = 0.35f, type = WaveType.TRIANGLE)
+        playPrecalculatedPcm(tokenCapturedPcm)
     }
 
     fun playVictory() {
-        // Fanfare chord
-        playSequence(
-            listOf(261.6, 329.6, 392.0, 523.3, 659.3, 784.0, 1046.5),
-            listOf(60, 60, 60, 60, 60, 60, 350),
-            volume = 0.25f,
-            type = WaveType.SINE,
-            gapMs = 10
-        )
+        playPrecalculatedPcm(victoryPcm)
     }
 
     private data class Note(val frequency: Double, val durationMs: Int)
