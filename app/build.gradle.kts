@@ -158,7 +158,7 @@ secrets {
 }
 
 googleServices {
-  missingGoogleServicesStrategy = MissingGoogleServicesStrategy.WARN
+  missingGoogleServicesStrategy = MissingGoogleServicesStrategy.IGNORE
 }
 
 
