@@ -23,20 +23,9 @@ jobs:
 
     - name: Setup Gradle
       uses: gradle/actions/setup-gradle@v4
-      with:
-        validate-wrappers: false
 
-    - name: Fix Gradle Wrapper
-      run: |
-        cd gradle/wrapper
-        rm -f gradle-wrapper.jar
-        curl -sL https://raw.githubusercontent.com/gradle/gradle/v8.5.0/subprojects/wrapper/src/main/resources/gradle-wrapper.jar -o gradle-wrapper.jar
-
-    - name: Make gradlew executable
-      run: chmod +x gradlew
-
-    - name: Build Debug & Release APK
-      run: ./gradlew assembleDebug assembleRelease
+    - name: Build Debug & Release APK without Wrapper
+      run: gradle assembleDebug assembleRelease
 
     - name: Upload Build Artifacts
       uses: actions/upload-artifact@v4
