@@ -46,6 +46,9 @@ jobs:
           keytool -genkey -v -keystore release-key.jks -keyalg RSA -keysize 2048 -validity 10000 -alias release -dname "CN=Android Debug, OU=Android, O=Unknown, L=Unknown, ST=Unknown, C=IN" -storepass androidrelease -keypass androidrelease
         fi
 
+    - name: Grant execute permission for gradlew
+      run: chmod +x gradlew
+
     - name: Build Debug & Release APK
       run: ./gradlew assembleDebug assembleRelease --stacktrace
 
