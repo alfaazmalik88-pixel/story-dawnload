@@ -52,40 +52,51 @@ fun BannerAd(modifier: Modifier = Modifier) {
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .height(50.dp)
             .background(Color(0xFF0F172A))
             .windowInsetsPadding(WindowInsets.navigationBars),
         contentAlignment = Alignment.Center
     ) {
-        when (adMode) {
-            0 -> {
-                // Google AdMob Test Banner Ad
-                AndroidView(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(50.dp),
-                    factory = { context ->
-                        AdView(context).apply {
-                            setAdSize(AdSize.BANNER)
-                            adUnitId = "ca-app-pub-3940256099942544/6300978111" // Google Official Test Banner ID
-                            adListener = object : AdListener() {
-                                override fun onAdLoaded() {
-                                    Log.d("AdMob", "AdMob Banner loaded successfully.")
-                                }
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(50.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            when (adMode) {
+                0 -> {
+                    // Google AdMob Test Banner Ad
+                    AndroidView(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(50.dp),
+                        factory = { context ->
+                            AdView(context).apply {
+                                val displayMetrics = context.resources.displayMetrics
+                                val adWidthPx = displayMetrics.widthPixels
+                                val density = displayMetrics.density
+                                val adWidth = (adWidthPx / density).toInt()
+                                val adaptiveSize = AdSize.getCurrentOrientationAnchoredAdaptiveBannerAdSize(context, if (adWidth > 0) adWidth else 320)
+                                setAdSize(adaptiveSize)
+                                adUnitId = "ca-app-pub-3940256099942544/6300978111" // Google Official Test Banner ID
+                                adListener = object : AdListener() {
+                                    override fun onAdLoaded() {
+                                        Log.d("AdMob", "AdMob Banner loaded successfully.")
+                                    }
 
-                                override fun onAdFailedToLoad(error: LoadAdError) {
-                                    Log.e("AdMob", "AdMob Banner failed: ${error.message}, switching to backup.")
-                                    adMode = 1
+                                    override fun onAdFailedToLoad(error: LoadAdError) {
+                                        Log.e("AdMob", "AdMob Banner failed: ${error.message}, switching to backup.")
+                                        adMode = 1
+                                    }
                                 }
+                                loadAd(AdRequest.Builder().build())
                             }
-                            loadAd(AdRequest.Builder().build())
                         }
-                    }
-                )
-            }
-            else -> {
-                // Backup animated interactive banner
-                BackupSimulatedBannerAd()
+                    )
+                }
+                else -> {
+                    // Backup animated interactive banner
+                    BackupSimulatedBannerAd()
+                }
             }
         }
     }

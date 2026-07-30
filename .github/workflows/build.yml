@@ -3,8 +3,6 @@ name: Build Android APK
 on:
   push:
     branches: [ "main", "master" ]
-  pull_request:
-    branches: [ "main", "master" ]
   workflow_dispatch:
 
 jobs:
@@ -26,10 +24,12 @@ jobs:
 
     - name: Setup Gradle
       uses: gradle/actions/setup-gradle@v4
+      with:
+        gradle-version: '8.11.1'
 
-    - name: Generate Clean Gradle Wrapper
+    - name: Regenerate Clean Gradle Wrapper
       run: |
-        gradle wrapper --gradle-version 9.3.1
+        gradle wrapper --gradle-version 8.11.1
         chmod +x gradlew
 
     - name: Setup Keystore
@@ -41,14 +41,14 @@ jobs:
           echo "$RELEASE_KEYSTORE_BASE64" | base64 --decode > release-key.jks
         fi
         if [ -f "release-key.jks" ]; then
-          if ! keytool -list -keystore release-key.jks -storepass androidrelease > /dev/null 2>&1; then
+          if ! keytool -list -keystore release-key.jks -storepass androidrelease >/dev/null 2>&1; then
             echo "Removing corrupted release-key.jks..."
             rm -f release-key.jks
           fi
         fi
         if [ ! -f "release-key.jks" ]; then
           echo "Generating clean release keystore..."
-          keytool -genkey -v -keystore release-key.jks -keyalg RSA -keysize 2048 -validity 10000 -alias release -dname "CN=Android Debug, OU=Android, O=Unknown, L=Unknown, ST=Unknown, C=IN" -storepass androidrelease -keypass androidrelease
+          keytool -genkey -v -keystore release-key.jks -keyalg RSA -keysize 2048 -validity 10000 -alias releasekey -storepass androidrelease -keypass androidrelease -dname "CN=LudoRelease, OU=Mobile, O=AIStudio, L=City, ST=State, C=US"
         fi
 
     - name: Build Debug & Release APK
