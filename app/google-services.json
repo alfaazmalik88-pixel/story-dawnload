@@ -1,14 +1,13 @@
 {
   "project_info": {
-    "project_number": "1050963446182",
-    "firebase_url": "https://crown-ludo-2-default-rtdb.firebaseio.com",
-    "project_id": "crown-ludo-2",
-    "storage_bucket": "crown-ludo-2.firebasestorage.app"
+    "project_number": "838222767085",
+    "project_id": "crown-ludo-4d159",
+    "storage_bucket": "crown-ludo-4d159.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:1050963446182:android:c10f3955e1bd2bfa442767",
+        "mobilesdk_app_id": "1:838222767085:android:74c213bf70803f72b17de4",
         "android_client_info": {
           "package_name": "com.crownludo.professional"
         }
@@ -16,7 +15,7 @@
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyB56yuiykT5BknDEWu9-eYjj-dsoezYZAc"
+          "current_key": "AIzaSyCUTHItpZbQODDR2kPW-ImbZX1LyT9GgYI"
         }
       ],
       "services": {
