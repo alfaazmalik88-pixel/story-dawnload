@@ -233,10 +233,10 @@ fun LudoBoard(
             val screenWidth = maxWidth
             val screenHeight = maxHeight
             
-            val padding = 8.dp
+            val padding = 6.dp
             // Calculate a responsive board size that fills maximum screen space
-            val maxBoardByHeight = screenHeight - 200.dp
-            val boardSize = minOf(screenWidth - padding * 2, maxBoardByHeight, 520.dp).coerceAtLeast(290.dp)
+            val maxBoardByHeight = screenHeight - 150.dp
+            val boardSize = minOf(screenWidth - padding * 2, maxBoardByHeight, 520.dp).coerceAtLeast(240.dp)
 
             Column(
                 modifier = Modifier
@@ -1836,7 +1836,12 @@ fun PlayerCornerCard(
     val defaultColor = state.baseColors.getOrNull(playerId) ?: LudoColor.BLUE
 
     if (player != null) {
-        val canRoll = isCurrentTurn && !state.hasRolled && !state.isRolling && !state.isMovingToken && player.type == PlayerType.HUMAN
+        val canRoll = if (state.gameMode == LudoGameMode.HYBRID_ONLINE) {
+            isCurrentTurn && !state.hasRolled && !state.isRolling && !state.isMovingToken && 
+                (playerId == viewModel.myFirebasePlayerSlot || player.type == PlayerType.HUMAN)
+        } else {
+            isCurrentTurn && !state.hasRolled && !state.isRolling && !state.isMovingToken && player.type == PlayerType.HUMAN
+        }
 
         val cardBorderColor = if (isCurrentTurn) defaultColor.value else defaultColor.value.copy(alpha = 0.3f)
         val cardBgColor = if (isCurrentTurn) Color(0xCC241F55) else Color(0x991E293B)

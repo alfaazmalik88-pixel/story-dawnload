@@ -886,10 +886,10 @@ class LudoViewModel : ViewModel() {
                 val projectId = try { com.example.BuildConfig.FIREBASE_PROJECT_ID } catch (e: Exception) { "" }
                 val appId = try { com.example.BuildConfig.FIREBASE_APPLICATION_ID } catch (e: Exception) { "" }
 
-                val finalDbUrl = if (dbUrl.isNotBlank() && !dbUrl.contains("your_firebase_database_url")) dbUrl else "https://crown-ludo-2-default-rtdb.firebaseio.com"
-                val finalApiKey = if (apiKey.isNotBlank() && !apiKey.contains("your_firebase_api_key")) apiKey else "AIzaSyB56yuiykT5BknDEWu9-eYjj-dsoezYZAc"
-                val finalProjectId = if (projectId.isNotBlank() && !projectId.contains("your_firebase_project_id")) projectId else "crown-ludo-2"
-                val finalAppId = if (appId.isNotBlank() && !appId.contains("your_firebase_application_id")) appId else "1:1050963446182:android:c10f3955e1bd2bfa442767"
+                val finalDbUrl = if (dbUrl.isNotBlank() && !dbUrl.contains("your_firebase_database_url")) dbUrl else "https://crown-ludo-4d159-default-rtdb.firebaseio.com"
+                val finalApiKey = if (apiKey.isNotBlank() && !apiKey.contains("your_firebase_api_key")) apiKey else "AIzaSyCUTHItpZbQODDR2kPW-ImbZX1LyT9GgYI"
+                val finalProjectId = if (projectId.isNotBlank() && !projectId.contains("your_firebase_project_id")) projectId else "crown-ludo-4d159"
+                val finalAppId = if (appId.isNotBlank() && !appId.contains("your_firebase_application_id")) appId else "1:838222767085:android:74c213bf70803f72b17de4"
 
                 val options = com.google.firebase.FirebaseOptions.Builder()
                     .setDatabaseUrl(finalDbUrl)
@@ -910,7 +910,7 @@ class LudoViewModel : ViewModel() {
                 val finalDbUrl = when {
                     !appDbUrl.isNullOrBlank() -> appDbUrl
                     dbUrl.isNotBlank() && !dbUrl.contains("your_firebase_database_url") -> dbUrl
-                    else -> "https://crown-ludo-2-default-rtdb.firebaseio.com"
+                    else -> "https://crown-ludo-4d159-default-rtdb.firebaseio.com"
                 }
                 
                 firebaseDb = try {
@@ -2044,7 +2044,7 @@ class LudoViewModel : ViewModel() {
                 isFindingOpponent = false,
                 players = players,
                 tokens = tokens,
-                currentPlayerIdx = players.first().id,
+                currentPlayerIdx = myFirebasePlayerSlot,
                 diceRoll = null,
                 hasRolled = false,
                 isRolling = false,
@@ -2273,7 +2273,8 @@ class LudoViewModel : ViewModel() {
         if (state.gamePhase != GamePhase.PLAYING || state.hasRolled || state.isRolling || state.isMovingToken) return
 
         if (state.gameMode == LudoGameMode.HYBRID_ONLINE && activeFirebaseMatchId != null) {
-            if (state.currentPlayerIdx != myFirebasePlayerSlot) {
+            val currP = getCurrentPlayer()
+            if (currP != null && currP.type == PlayerType.HUMAN && state.currentPlayerIdx != myFirebasePlayerSlot) {
                 // Out of turn roll restricted!
                 return
             }
@@ -2413,7 +2414,8 @@ class LudoViewModel : ViewModel() {
         if (!state.hasRolled || state.isRolling || state.isMovingToken || state.gamePhase != GamePhase.PLAYING) return
         
         if (state.gameMode == LudoGameMode.HYBRID_ONLINE) {
-            if (token.playerId != myFirebasePlayerSlot || state.currentPlayerIdx != myFirebasePlayerSlot) {
+            val currP = getCurrentPlayer()
+            if (currP != null && currP.type == PlayerType.HUMAN && (token.playerId != myFirebasePlayerSlot || state.currentPlayerIdx != myFirebasePlayerSlot)) {
                 return // Not your token or not your turn
             }
         } else {
@@ -2430,7 +2432,8 @@ class LudoViewModel : ViewModel() {
     private fun moveToken(token: Token, steps: Int) {
         val state = _uiState.value
         if (state.gameMode == LudoGameMode.HYBRID_ONLINE && activeFirebaseMatchId != null) {
-            if (state.currentPlayerIdx != myFirebasePlayerSlot) {
+            val currP = getCurrentPlayer()
+            if (currP != null && currP.type == PlayerType.HUMAN && state.currentPlayerIdx != myFirebasePlayerSlot) {
                 // Not my turn to move!
                 return
             }
@@ -2622,8 +2625,9 @@ class LudoViewModel : ViewModel() {
     private fun passTurn() {
         val state = _uiState.value
         if (state.gameMode == LudoGameMode.HYBRID_ONLINE && activeFirebaseMatchId != null) {
-            if (state.currentPlayerIdx != myFirebasePlayerSlot) {
-                // Ignore local pass calls if it is not my turn, since the actual active player handles passing and syncing via Firebase!
+            val currP = getCurrentPlayer()
+            if (currP != null && currP.type == PlayerType.HUMAN && state.currentPlayerIdx != myFirebasePlayerSlot) {
+                // Ignore local pass calls if it is not my turn
                 return
             }
         }

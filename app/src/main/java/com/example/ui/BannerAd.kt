@@ -52,9 +52,9 @@ fun BannerAd(modifier: Modifier = Modifier) {
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .height(68.dp)
+            .height(50.dp)
             .background(Color(0xFF0F172A))
-            .padding(bottom = 12.dp),
+            .windowInsetsPadding(WindowInsets.navigationBars),
         contentAlignment = Alignment.Center
     ) {
         when (adMode) {
