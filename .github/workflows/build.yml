@@ -25,6 +25,9 @@ jobs:
         with:
           validate-wrappers: false
 
+      - name: Fix and Regenerate Gradle Wrapper
+        run: gradle wrapper
+
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
