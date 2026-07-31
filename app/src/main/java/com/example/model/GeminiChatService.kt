@@ -75,6 +75,14 @@ object GeminiChatService {
             .create(GeminiApi::class.java)
     }
 
+    private fun getApiKey(): String {
+        return try {
+            BuildConfig.GEMINI_API_KEY
+        } catch (e: Exception) {
+            ""
+        }
+    }
+
     // Pre-configured personalities
     private val systemInstructions = """
         You are simulating an active Ludo game chat with real human players. 
@@ -104,7 +112,7 @@ object GeminiChatService {
         botName: String,
         gameStateSummary: String
     ): String = withContext(Dispatchers.IO) {
-        val apiKey = BuildConfig.GEMINI_API_KEY
+        val apiKey = getApiKey()
         if (apiKey.isEmpty() || apiKey == "MY_GEMINI_API_KEY") {
             Log.w(TAG, "Gemini API key is empty or placeholder. Using fallback.")
             return@withContext getLocalFallback(event, botName)
@@ -146,7 +154,7 @@ object GeminiChatService {
         activeBots: List<String>,
         gameStateSummary: String
     ): String = withContext(Dispatchers.IO) {
-        val apiKey = BuildConfig.GEMINI_API_KEY
+        val apiKey = getApiKey()
         if (apiKey.isEmpty() || apiKey == "MY_GEMINI_API_KEY") {
             Log.w(TAG, "Gemini API key is empty or placeholder. Using fallback.")
             return@withContext getLocalChatFallback(userMessage, activeBots)
@@ -260,7 +268,7 @@ object GeminiChatService {
         diceRoll: Int,
         botPlayerName: String
     ): Int = withContext(Dispatchers.IO) {
-        val apiKey = BuildConfig.GEMINI_API_KEY
+        val apiKey = getApiKey()
         if (apiKey.isEmpty() || apiKey == "MY_GEMINI_API_KEY") {
             Log.w(TAG, "Gemini API key is empty or placeholder. Falling back.")
             return@withContext -1

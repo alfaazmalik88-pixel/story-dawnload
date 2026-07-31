@@ -92,16 +92,18 @@ android {
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
-    // Sanitize and inject Firebase keys to be resilient against malformed user secrets
+    // Sanitize and inject Firebase & Gemini keys to be resilient against malformed user secrets
     val sanitizedDbUrl = getSanitizedEnvSecret(project.rootDir, "FIREBASE_DATABASE_URL")
     val sanitizedApiKey = getSanitizedEnvSecret(project.rootDir, "FIREBASE_API_KEY")
     val sanitizedProjectId = getSanitizedEnvSecret(project.rootDir, "FIREBASE_PROJECT_ID")
     val sanitizedAppId = getSanitizedEnvSecret(project.rootDir, "FIREBASE_APPLICATION_ID")
+    val sanitizedGeminiKey = getSanitizedEnvSecret(project.rootDir, "GEMINI_API_KEY")
 
     buildConfigField("String", "FIREBASE_DATABASE_URL", "\"$sanitizedDbUrl\"")
     buildConfigField("String", "FIREBASE_API_KEY", "\"$sanitizedApiKey\"")
     buildConfigField("String", "FIREBASE_PROJECT_ID", "\"$sanitizedProjectId\"")
     buildConfigField("String", "FIREBASE_APPLICATION_ID", "\"$sanitizedAppId\"")
+    buildConfigField("String", "GEMINI_API_KEY", "\"$sanitizedGeminiKey\"")
   }
 
   signingConfigs {
@@ -155,6 +157,7 @@ secrets {
   ignoreList.add("FIREBASE_API_KEY")
   ignoreList.add("FIREBASE_PROJECT_ID")
   ignoreList.add("FIREBASE_APPLICATION_ID")
+  ignoreList.add("GEMINI_API_KEY")
 }
 
 googleServices {
