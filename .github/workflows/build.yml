@@ -28,8 +28,10 @@ jobs:
           validate-wrappers: false
 
       - name: Setup Keystore
-        # Yahan aapka keystore setup karne ka code hoga
         run: echo "Setting up keystore..."
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
 
       - name: Build Debug & Release APK
         run: ./gradlew assembleDebug assembleRelease
