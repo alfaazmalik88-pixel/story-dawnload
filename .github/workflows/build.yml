@@ -40,7 +40,7 @@ jobs:
         run: chmod +x gradlew
 
       - name: Build Debug & Release APK
-        run: ./gradlew assembleDebug assembleRelease
+        run: ./gradlew assembleDebug assembleRelease --info
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
 
